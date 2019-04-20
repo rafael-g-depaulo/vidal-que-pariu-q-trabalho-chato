@@ -1,11 +1,12 @@
 .data
-file_name: 		.asciiz "Code/test.txt"
-nada: 				.space 18
-file_buffer: 	.space 20
+file_name: 					.asciiz "Code/Trabalho/test.txt"
+nada: 							.space 18
+file_buffer: 				.space 20
 file_buffer_length: .word 20
-line_buffer:	.space 81
-file_descriptor: .word 0
-newline:      .word '\n'
+line_buffer:				.space 81
+file_descriptor: 		.word 0
+newline:      			.word '\n'
+line:								.asciiz "linha: "
 
 .text
 # open file (do once)
@@ -67,12 +68,29 @@ line_done:
 	sb $t3, 0($s1)								 # write '\0' to end line
 	
 	###### (TODO) process line
+	# printando pra tela como teste
+	la $a0, line
+	li $v0, 4
+	syscall
+	la $a0, line_buffer
+	syscall
+	la $a0, newline
+	syscall
 	###### (TODO) process line
 
-	###### (TODO) ADD REST OF BUFFER TO NEXT LINE
-	###### (TODO) ADD REST OF BUFFER TO NEXT LINE do it thinking about below one
-	###### (TOODO) reset line pointer do it thinking about above one
-	###### (TOODO) reset line pointer
+	###### ADD REST OF BUFFER TO NEXT LINE & RESET LINE POINTER
+	# $t0: buffer pointer
+	# $s1: line buffer pointer
+	addi $t0, $t0, 1 						# current $t0 is '\n', move to next one
+	la $s1, line_buffer					# reset line pointer to start of buffer
+	write_buffer_to_line_loop:
+	beq $t0, $t1, finished_with_buffer	# if finished writing from buffer, leave loop
+	lb $t3, 0($t0)							# get char from buffer
+	sb $t3, 0($s1)							# write char to line buffer
+	addi $t0, $t0, 1						# increase buffer pointer
+	addi $s1, $s1, 1						# increase line buffer pointer
+	j write_buffer_to_line_loop
+	finished_with_buffer:
 	
 	# check $t5. if == 1, EOF reached, dont get another line
 	beq $t5, $zero, get_line_chars 	# get next line if not at EOF
@@ -82,6 +100,8 @@ line_done:
 	li $v0, 16								# close file
 	syscall										# close file
 	
-	
+	# end program
+	li $v0, 10
+	syscall
 	
 # read file code from https://stackoverflow.com/questions/37469323/assembly-mips-read-text-from-file-and-buffer/37505359#37505359
