@@ -1,22 +1,71 @@
 .data
-file_name: 					.asciiz "Code/Trabalho/test.txt"
-nada: 							.space 18
-file_buffer: 				.space 20
-file_buffer_length: .word 20
-line_buffer:				.space 81
-file_descriptor: 		.word 0
-newline:      			.word '\n'
-line:								.asciiz "linha: "
+
+# USED BY "get_file_name"
+file_name_buffer:   	.space 40
+enter_f_name_prompt: 	.asciiz "Entre o nome do arquivo a ser compilado: "
+# USED BY "read_file_lines"
+file_name: 						.asciiz "Code/Trabalho/sup.asm"
+nada: 								.space 18
+file_buffer: 					.space 20
+file_buffer_length: 	.word 20
+line_buffer:					.space 81
+file_descriptor: 			.word 0
+newline:      				.word '\n'
+line:									.asciiz "linha: "
 
 .text
+	# get filename
+	jal get_file_name
 	
-	la $a0, file_name
+	move $a0, $v0
 	la $a1, print_line
 	jal read_file_lines
 	
 	# end program
 	li $v0, 10
 	syscall
+
+# FUNCAO QUE PEGA O NOME DO ARQUIVO
+get_file_name:
+# returns: pointer to filename string
+
+	# push to stack
+	subi $sp, $sp, 12
+	sw $a0, 0($sp)
+	sw $a1, 4($sp)
+	sw $v0, 8($sp)
+
+	# prompt user to enter file name
+	la $a0, enter_f_name_prompt
+	li $v0, 4
+	syscall
+
+	# read file name
+	la $a0, file_name_buffer
+	li $a1, 40
+	li $v0, 8
+	syscall
+	
+	# replace '\n' with '\0'
+	li $t1, '\n'									# load imediate '\n'
+	get_fname_loop:								
+	lb $t0, 0($a0)								# get char from filename
+	addi $a0, $a0, 1							# point to next char
+	bne $t0, $t1, get_fname_loop	# while char "= '\n'
+	li $t0, '\0'									# load imediate '\0'
+	sb $t0, -1($a0)								# replace '\n' with '\0'
+	
+	end_get_fname_loop:
+	
+	# pop from stack
+	lw $a0, 0($sp)
+	lw $a1, 4($sp)
+	lw $v0, 8($sp)
+	addi $sp, $sp, 12
+
+	# return
+	la $v0, file_name_buffer
+	jr $ra
 
 # FUNCAO TESTE QUE PRINTA A STRING INSERIDA EM $a0
 print_line:
@@ -65,10 +114,7 @@ read_file_lines:
 	sw $ra, 44($sp)				# used for function calls
 
 	# open file (do once)
-	la $a0, file_name
-
 	li   $v0, 13       						# system call for open file
-	la   $a0, file_name						# input file name
 	li   $a1, 0        						# flag for reading
 	li   $a2, 0        						# mode is ignored
 	syscall            						# open a file 
@@ -169,5 +215,6 @@ line_done:
 	jr $ra
 	# return
 
-# END OF FUNCTION 
+# END OF FUNCTION
+
 # read file code from https://stackoverflow.com/questions/37469323/assembly-mips-read-text-from-file-and-buffer/37505359#37505359
