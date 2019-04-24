@@ -12,15 +12,28 @@ line_buffer:					.space 81
 file_descriptor: 			.word 0
 newline:      				.word '\n'
 line:									.asciiz "linha: "
+lineend:							.asciiz "linha acabou."
 
 .text
 	# get filename
 	jal get_file_name
 	
+	# print lines test
 	move $a0, $v0
 	la $a1, print_line
 	jal read_file_lines
 	
+	# # count lines test
+	# move $a0, $v0
+	# la $a1, count_lines
+	# li $a2, 0
+	# jal read_file_lines
+
+	# # print return value
+	# move $a0, $v0
+	# li $v0, 1
+	# syscall
+
 	# end program
 	li $v0, 10
 	syscall
@@ -67,6 +80,13 @@ get_file_name:
 	la $v0, file_name_buffer
 	jr $ra
 
+# FUNCAO DE TESTE QUE CONTA AS LINHAS DO AQUIVO
+count_lines:
+	# a0, linha
+	# a1, counter
+	addi $v0, $a1, 1
+	jr $ra
+
 # FUNCAO TESTE QUE PRINTA A STRING INSERIDA EM $a0
 print_line:
 	# push to stack
@@ -80,6 +100,8 @@ print_line:
 	li $v0, 4
 	syscall
 	move $a0, $t0
+	syscall
+	la $a0, lineend
 	syscall
 	la $a0, newline
 	syscall
@@ -95,25 +117,28 @@ print_line:
 # FUNCAO QUE LE UM ARQUIVO LINHA A LINHA E EXECUTA A FUNCAO DADA EM CADA LINHA
 read_file_lines:
 # $a0: nome do arquivo
-# $a1: funcao a ser executada
+# $a1: funcao a ser executada ($a0: linha da string, $a1: accumulate value) => accumulate value for next iteration
 # $a2: initial value for reduce
 # returns: void
 
 	# push registers to the stack
-	subi $sp, $sp, 48
-	sw $a0, 0($sp)				# used for function calls
-	sw $a1, 4($sp)				# used for function calls
-	sw $v0, 8($sp)				# used for system calls
+	subi $sp, $sp, 52
+	sw $a0,  0($sp)				# used for function calls
+	sw $a1,  4($sp)				# used for function calls
+	sw $a2,  8($sp)				# used for function calls
 	sw $t0, 12($sp)				# used for file buffer pointer
 	sw $t1, 16($sp)				# used for pointer to end of file buffer
 	sw $t2, 20($sp)				# used read/write bytes from file buffer to string buffer
 	sw $t3, 24($sp)				# used to store chars for comparison and insertion
 	sw $t4, 28($sp)				# used to store end of buffer flag
 	sw $t5, 32($sp)				# used to store EOF flag
-	sw $s0, 36($sp)				# used to store file descriptor
-	sw $s1, 40($sp)				# used for line buffer pointer
-	sw $a2, 44($sp)				# used for the line function reduce thing
+	sw $t6, 36($sp)				# used to store the accumulate value of the given function
+	sw $s0, 40($sp)				# used to store file descriptor
+	sw $s1, 44($sp)				# used for line buffer pointer
 	sw $ra, 48($sp)				# used for function calls
+	
+	move $t6, $a2					# store initial value
+	
 
 	# open file (do once)
 	li   $v0, 13       						# system call for open file
@@ -173,11 +198,11 @@ line_done:
 	###### CALL FUNCTION GIVEN, USING LINE BUFFER AS ARGUMENT 0, AND THE PREVIOUS RETURN AS ARGUMENT 1
 	lw $t3, 4($sp)						# get function address
 	la $a0, line_buffer				# set up line buffer as argument
-	move $a1, $a2							# reduce argument 
+	move $a1, $t6							# reduce argument previous accumulate or initial value
 	la $ra, return_from_call	# set up return address
 	jr $t3										# call function
 	return_from_call:					# return
-	move $a2, $v0							# save accumulate for next iteration
+	move $t6, $v0							# save accumulate for next iteration
 	
 	###### ADD REST OF BUFFER TO NEXT LINE & RESET LINE POINTER
 	# $t0: buffer pointer
@@ -201,21 +226,24 @@ line_done:
 	li $v0, 16								# close file
 	syscall										# close file
 
+	# load return value
+	lw $v0, 44($sp)
+
 	# pop registers from the stack
-	lw $a0, 0($sp)				# used for function calls
-	lw $a1, 4($sp)				# used for function calls
-	lw $v0, 8($sp)				# used for system calls
+	lw $a0,  0($sp)				# used for function calls
+	lw $a1,  4($sp)				# used for function calls
+	lw $a2,  8($sp)				# used for function calls
 	lw $t0, 12($sp)				# used for file buffer pointer
 	lw $t1, 16($sp)				# used for pointer to end of file buffer
 	lw $t2, 20($sp)				# used read/write bytes from file buffer to string buffer
 	lw $t3, 24($sp)				# used to store chars for comparison and insertion
 	lw $t4, 28($sp)				# used to store end of buffer flag
 	lw $t5, 32($sp)				# used to store EOF flag
-	lw $s0, 36($sp)				# used to store file descriptor
-	lw $s1, 40($sp)				# used for line buffer pointer
-	lw $a2, 44($sp)				# used for the line function reduce thing
+	lw $t6, 36($sp)				# used to store the accumulate value of the given function
+	lw $s0, 40($sp)				# used to store file descriptor
+	lw $s1, 44($sp)				# used for line buffer pointer
 	lw $ra, 48($sp)				# used for function calls
-	addi $sp, $sp, 48
+	addi $sp, $sp, 52
 	
 	jr $ra
 	# return
