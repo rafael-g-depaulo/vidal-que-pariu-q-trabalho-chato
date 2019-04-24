@@ -1,8 +1,12 @@
 .data
+# USED BY "insert_label"
+label_list:						.word 0		# ponteiro para o primeiro elemento da lista
+label_list_end:				.word 0		# ponteiro para o último elemento da lista
 
 # USED BY "get_file_name"
 file_name_buffer:   	.space 40
 enter_f_name_prompt: 	.asciiz "Entre o nome do arquivo a ser compilado: "
+
 # USED BY "read_file_lines"
 file_name: 						.asciiz "Code/Trabalho/sup.asm"
 nada: 								.space 18
@@ -113,7 +117,89 @@ print_line:
 	addi $sp, $sp, 12
 	
 	jr $ra # return
-		
+
+# FUNCAO QUE INSERE UMA STRING (QUE REPRESENTA UMA LABEL) E O ENDEREÇO DA LABEL EM UMA LISTA
+########## UNTESTED #########################
+########## UNTESTED #########################
+########## UNTESTED #########################
+insert_label:
+# $a0: número que representa o endereço da próxima instrução após a label
+# $a1: ponteiro para a string que representa a label
+# $v0: address of new element
+
+	# push to stack
+	subi $sp, $sp, 32
+	sw $t0,  0($sp)		# used for a counter for how much space should be alocated for new list element
+	sw $t1,  4($sp)		# used to store '\0' for comparison
+	sw $t2,  8($sp)		# used for comparison & as a pointer
+	sw $t3, 12($sp)		# used to store $a0, since $a0 is used for syscalls
+	sw $t4, 16($sp)		# used to store $a1 & as a pointer
+	sw $a0, 20($sp)		# used for syscall
+	sw $a1, 24($sp)		# used as a pointer to string
+
+	move $t3, $a0				# move $a0 to $t3, because we need $a0 for the syscall
+	move $t4, $a1				# mover $a1 to $t4, because we need to save it for later
+
+	# count number of byter to allocate in heap
+	li $t0, 8							# needs to allocate 1 word for label-address + 1 word for pointer to next list element
+	li $t1, '\0' 					# immediate used to compare
+	il_loop:
+	lw $t2, 0($a1)				# get char from label
+	addi $t0, $t0, 1			# increase counter for number of chars to allocate
+	addi $a1, $a1, 1			# increase label pointer (look at next character)
+	bne $t2, $t1, il_loop	# while not '\0', keep looking and increasing counter
+	# now $t0 contains the ammount of bytes we need to allocate
+
+	# allocate memory
+	move $a0, $t0
+	li $v0, 9
+	syscall
+
+	# create list element
+	li $t2, 0				# address to next list element (null)
+	sw $t2, 0($v0)	# address to next list element (null)
+	sw $t3, 4($v0)	# label-address (endereço da intrução após a label no programa sendo compilado)
+	
+	# copy the string into list element
+	# OBS: $t4 is pointer to first char
+	# OBS: $a1 is pointer to after last char
+	# OBS: $t2 is pointer to first char of list element
+	addi $t2, $v0, 8	# set list ele pointer
+	il_copy_str:
+	lw $t0, 0($t4)		# get char
+	sw $t0, 0($t2)		# write char
+	addi $t4, $t4, 1	# increase label str pointer
+	addi $t2, $t2, 1	# increase list ele pointer
+	bne $t4, $a1, il_copy_str	# while not at the end
+
+	# if list is empty, point first to new label
+	lw $t0, label_list						# get first element of list
+	beq $t0, $zero, il_not_first	# if first is not null, skip this step
+	sw $v0, label_list						# set first element as current one
+	j il_update_last
+
+	# if list isnt empty, make previous last element point to current last element
+	il_not_first:
+	la $t0, label_list_end	# get last element
+	sw $v0, 0($t0)					# first word is pointer to next element. make it point to element currently being created
+
+	# point last element to new label
+	il_update_last:
+	la $t0, label_list_end
+	sw $v0, 0($t0)
+
+	# pop from stack
+	lw $t0,  0($sp)		# used for a counter for how much space should be alocated for new list element
+	lw $t1,  4($sp)		# used to store '\0' for comparison
+	lw $t2,  8($sp)		# used for comparison & as a pointer
+	lw $t3, 12($sp)		# used to store $a0, since $a0 is used for syscalls
+	lw $t4, 16($sp)		# used to store $a1 & as a pointer
+	lw $a0, 20($sp)		# used for syscall
+	lw $a1, 24($sp)		# used as a pointer to string
+	addi $sp, $sp, 32
+
+	jr $ra	#return
+
 # FUNCAO QUE LE UM ARQUIVO LINHA A LINHA E EXECUTA A FUNCAO DADA EM CADA LINHA
 read_file_lines:
 # $a0: nome do arquivo
