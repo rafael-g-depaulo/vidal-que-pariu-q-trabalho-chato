@@ -19,13 +19,13 @@ line:									.asciiz "linha: "
 lineend:							.asciiz "linha acabou."
 
 .text
-	# # get filename
-	# jal get_file_name
+	# get filename
+	jal get_file_name
 	
-	# # print lines test
-	# move $a0, $v0
-	# la $a1, print_line
-	# jal read_file_lines
+	# print lines test
+	move $a0, $v0
+	la $a1, print_line
+	jal read_file_lines
 	
 	# # count lines test
 	# move $a0, $v0
@@ -66,7 +66,7 @@ get_file_name:
 	# replace '\n' with '\0'
 	li $t1, '\n'									# load imediate '\n'
 	get_fname_loop:								
-	lb $t0, 0($a0)								# get char from filename
+	lbu $t0, 0($a0)								# get char from filename
 	addi $a0, $a0, 1							# point to next char
 	bne $t0, $t1, get_fname_loop	# while char "= '\n'
 	li $t0, '\0'									# load imediate '\0'
@@ -141,7 +141,7 @@ insert_label:
 	li $t0, 8							# needs to allocate 1 word for label-address + 1 word for pointer to next list element
 	li $t1, '\0' 					# immediate used to compare
 	il_loop:
-	lb $t2, 0($a1)				# get char from label
+	lbu $t2, 0($a1)				# get char from label
 	addi $t0, $t0, 1			# increase counter for number of chars to allocate
 	addi $a1, $a1, 1			# increase label pointer (look at next character)
 	bne $t2, $t1, il_loop	# while not '\0', keep looking and increasing counter
@@ -162,7 +162,7 @@ insert_label:
 	# OBS: $t2 is pointer to first char of list element
 	addi $t2, $v0, 8	# set list ele pointer
 	il_copy_str:
-	lb $t0, 0($t4)		# get char
+	lbu $t0, 0($t4)		# get char
 	sb $t0, 0($t2)		# write char
 	addi $t4, $t4, 1	# increase label str pointer
 	addi $t2, $t2, 1	# increase list ele pointer
@@ -293,7 +293,7 @@ line_done:
 	la $s1, line_buffer					# reset line pointer to start of buffer
 	write_buffer_to_line_loop:
 	beq $t0, $t1, finished_with_buffer	# if finished writing from buffer, leave loop
-	lb $t3, 0($t0)							# get char from buffer
+	lbu $t3, 0($t0)							# get char from buffer
 	sb $t3, 0($s1)							# write char to line buffer
 	addi $t0, $t0, 1						# increase buffer pointer
 	addi $s1, $s1, 1						# increase line buffer pointer
