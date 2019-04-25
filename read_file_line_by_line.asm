@@ -1,6 +1,9 @@
 .data
-# USED BY "get_label"
+# USED BY "get_label_dec"
 label_dec_str:				.space 	40
+# USED IN "get_label_dec" tests
+linha_teste:					.asciiz "minha_label:   addi $t2, $t2, 9  " 
+linha_teste1:					.asciiz " li $t0, 2 \n\n    \tminha_label:   addi $t2, $t2, 9  " 
 
 # USED BY "insert_label"
 label_list:						.word 	0	# ponteiro para o primeiro elemento da lista
@@ -20,13 +23,13 @@ line:									.asciiz	"linha: "
 lineend:							.asciiz "linha acabou."
 
 .text
-	# get filename
-	jal get_file_name
+	# # get filename
+	# jal get_file_name
 	
-	# print lines test
-	move $a0, $v0
-	la $a1, print_line
-	jal read_file_lines
+	# # print lines test
+	# move $a0, $v0
+	# la $a1, print_line
+	# jal read_file_lines
 	
 	# # count lines test
 	# move $a0, $v0
@@ -38,6 +41,10 @@ lineend:							.asciiz "linha acabou."
 	# move $a0, $v0
 	# li $v0, 1
 	# syscall
+
+	# get label dec test
+	la $a0, linha_teste1
+	jal get_label_dec
 	
 	# end program
 	li $v0, 10
@@ -119,7 +126,7 @@ print_line:
 	
 	jr $ra # return
 
-# FUNCAO QUE LE UMA STRING, CHECA SE NELA TEM A DELCARACAO DE UMA LABEL, E RETORNA UMA STRING COM O NOME DA LABEL
+# FUNCAO QUE LE UMA STRING, CHECA SE NELA TEM A DEClARACAO DE UMA LABEL, E RETORNA UMA STRING COM O NOME DA LABEL
 ### UNTESTED #############
 ### UNTESTED #############
 ### UNTESTED #############
@@ -160,9 +167,9 @@ get_label_dec:
 	li $t3, '0'
 	li $t4, '9'
 	slt $t2, $t1, $t3		# if char is less than '0'
-	beq $t2, $zero, not_numeric
+	bne $t2, $zero, not_numeric
 	slt $t2, $t4, $t1		# if '9' is less than char
-	beq	$t2, $zero, not_numeric
+	bne	$t2, $zero, not_numeric
 	j is_valid					# if got here, is a number (and therefore valid)
 	not_numeric:
 
@@ -170,9 +177,9 @@ get_label_dec:
 	li $t3, 'A'
 	li $t4, 'Z'
 	slt $t2, $t1, $t3		# if char is less than 'A'
-	beq $t2, $zero, not_upcase
+	bne $t2, $zero, not_upcase
 	slt $t2, $t4, $t1		# if 'Z' is less than char
-	beq	$t2, $zero, not_upcase
+	bne	$t2, $zero, not_upcase
 	j is_valid					# if got here, is a number (and therefore valid)
 	not_upcase:
 
@@ -180,9 +187,9 @@ get_label_dec:
 	li $t3, 'a'
 	li $t4, 'z'
 	slt $t2, $t1, $t3		# if char is less than 'a'
-	beq $t2, $zero, not_downcase
+	bne $t2, $zero, not_downcase
 	slt $t2, $t4, $t1		# if 'z' is less than char
-	beq	$t2, $zero, not_downcase
+	bne	$t2, $zero, not_downcase
 	j is_valid					# if got here, is a number (and therefore valid)
 	not_downcase:
 
@@ -208,8 +215,9 @@ get_label_dec:
 
 	# end label and return
 	end_label:
+	sb $zero, 0($t0)			# add a \0 to next char in label write buffer
 	li $v0, 1
-	la $v1, label_dec_str
+	move $v1, $a0					# return address of next char in string after label
 
 	gld_pop_and_return:
 	# pop from stack
