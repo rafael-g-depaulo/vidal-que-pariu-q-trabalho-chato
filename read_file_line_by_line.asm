@@ -2,6 +2,10 @@
 # USED BY "insert_label"
 label_list:						.word 0		# ponteiro para o primeiro elemento da lista
 label_list_end:				.word 0		# ponteiro para o último elemento da lista
+# USED IN TESTS OF "insert_label"
+label1: .asciiz "minha_label"
+label2: .asciiz "label222"
+label3: .asciiz "kkk_super_label"
 
 # USED BY "get_file_name"
 file_name_buffer:   	.space 40
@@ -19,13 +23,13 @@ line:									.asciiz "linha: "
 lineend:							.asciiz "linha acabou."
 
 .text
-	# get filename
-	jal get_file_name
+	# # get filename
+	# jal get_file_name
 	
-	# print lines test
-	move $a0, $v0
-	la $a1, print_line
-	jal read_file_lines
+	# # print lines test
+	# move $a0, $v0
+	# la $a1, print_line
+	# jal read_file_lines
 	
 	# # count lines test
 	# move $a0, $v0
@@ -38,6 +42,19 @@ lineend:							.asciiz "linha acabou."
 	# li $v0, 1
 	# syscall
 
+	# testando insert_label
+	li $a0, 0x0245		# endereço da prox instrucao da label
+	la $a1, label1		# string com o nome da label
+	jal insert_label
+	
+	li $a0, 0x0456		# endereço da prox instrucao da label
+	la $a1, label2		# string com o nome da label
+	jal insert_label
+
+	li $a0, 0x9876		# endereço da prox instrucao da label
+	la $a1, label3		# string com o nome da label
+	jal insert_label
+	
 	# end program
 	li $v0, 10
 	syscall
@@ -144,7 +161,7 @@ insert_label:
 	li $t0, 8							# needs to allocate 1 word for label-address + 1 word for pointer to next list element
 	li $t1, '\0' 					# immediate used to compare
 	il_loop:
-	lw $t2, 0($a1)				# get char from label
+	lb $t2, 0($a1)				# get char from label
 	addi $t0, $t0, 1			# increase counter for number of chars to allocate
 	addi $a1, $a1, 1			# increase label pointer (look at next character)
 	bne $t2, $t1, il_loop	# while not '\0', keep looking and increasing counter
@@ -156,9 +173,8 @@ insert_label:
 	syscall
 
 	# create list element
-	li $t2, 0				# address to next list element (null)
-	sw $t2, 0($v0)	# address to next list element (null)
-	sw $t3, 4($v0)	# label-address (endereço da intrução após a label no programa sendo compilado)
+	sw $zero, 0($v0)	# address to next list element (null)
+	sw $t3, 4($v0)		# label-address (endereço da intrução após a label no programa sendo compilado)
 	
 	# copy the string into list element
 	# OBS: $t4 is pointer to first char
@@ -166,21 +182,21 @@ insert_label:
 	# OBS: $t2 is pointer to first char of list element
 	addi $t2, $v0, 8	# set list ele pointer
 	il_copy_str:
-	lw $t0, 0($t4)		# get char
-	sw $t0, 0($t2)		# write char
+	lb $t0, 0($t4)		# get char
+	sb $t0, 0($t2)		# write char
 	addi $t4, $t4, 1	# increase label str pointer
 	addi $t2, $t2, 1	# increase list ele pointer
 	bne $t4, $a1, il_copy_str	# while not at the end
 
 	# if list is empty, point first to new label
 	lw $t0, label_list						# get first element of list
-	beq $t0, $zero, il_not_first	# if first is not null, skip this step
+	bne $t0, $zero, il_not_first	# if first is not null, skip this step
 	sw $v0, label_list						# set first element as current one
 	j il_update_last
 
 	# if list isnt empty, make previous last element point to current last element
 	il_not_first:
-	la $t0, label_list_end	# get last element
+	lw $t0, label_list_end	# get last element
 	sw $v0, 0($t0)					# first word is pointer to next element. make it point to element currently being created
 
 	# point last element to new label
