@@ -1,21 +1,22 @@
 .data
+# USED BY "get_label"
+label_dec_str:				.space 	40
+
 # USED BY "insert_label"
-label_list:						.word 0		# ponteiro para o primeiro elemento da lista
-label_list_end:				.word 0		# ponteiro para o último elemento da lista
+label_list:						.word 	0	# ponteiro para o primeiro elemento da lista
+label_list_end:				.word 	0	# ponteiro para o último elemento da lista
 
 # USED BY "get_file_name"
-file_name_buffer:   	.space 40
+file_name_buffer:   	.space 	40
 enter_f_name_prompt: 	.asciiz "Entre o nome do arquivo a ser compilado: "
 
 # USED BY "read_file_lines"
-file_name: 						.asciiz "Code/Trabalho/sup.asm"
-nada: 								.space 18
-file_buffer: 					.space 20
-file_buffer_length: 	.word 20
-line_buffer:					.space 81
-file_descriptor: 			.word 0
-newline:      				.word '\n'
-line:									.asciiz "linha: "
+file_buffer: 					.space 	20
+file_buffer_length: 	.word 	20
+line_buffer:					.space 	80
+file_descriptor: 			.word 	0
+newline:      				.word 	'\n'
+line:									.asciiz	"linha: "
 lineend:							.asciiz "linha acabou."
 
 .text
@@ -117,6 +118,110 @@ print_line:
 	addi $sp, $sp, 12
 	
 	jr $ra # return
+
+# FUNCAO QUE LE UMA STRING, CHECA SE NELA TEM A DELCARACAO DE UMA LABEL, E RETORNA UMA STRING COM O NOME DA LABEL
+### UNTESTED #############
+### UNTESTED #############
+### UNTESTED #############
+get_label_dec:
+# $a0: ponteiro para a string (linha)
+# $v0: 1 se achou uma label, 0 se não achou
+# $v1: ponteiro para o próximo char depois do ':' na string recebida em $a1, se $v0 = 1
+# OBS: string que representa a label é guardada em um buffer de local fixo na memória, na label "label_dec_str"
+
+	# push to stack
+	subi $sp, $sp, 24
+	sw $a0,  0($sp)		# used as a pointer to string to be read
+	sw $t0,  4($sp)		# used as a pointer to label being constructed
+	sw $t1,  8($sp)		# used as a temp for char being read
+	sw $t2, 12($sp)		# used as a flag for set less than
+	sw $t3, 16($sp)		# used to store immediate for comparison
+	sw $t4, 20($sp)		# used to store immediate for comparison
+
+	# construir possivel label
+	la $t0, label_dec_str		# set pointer to first char in write buffer
+
+	gld_loop:
+	lbu $t1, 0($a0)					# read char from line
+	
+	# if reached '\0', return false
+	beq $t1, $zero, string_ended
+
+	# if char is ':', end label
+	beq $t1, ':', end_label
+	
+	# if char is valid (a-zA-Z0-9_%$) write to label buffer
+		# valid symbols
+	beq $t1, '_', is_valid
+	beq $t1, '$', is_valid
+	beq $t1, '%', is_valid
+	
+		# if 0-9
+	li $t3, '0'
+	li $t4, '9'
+	slt $t2, $t1, $t3		# if char is less than '0'
+	beq $t2, $zero, not_numeric
+	slt $t2, $t4, $t1		# if '9' is less than char
+	beq	$t2, $zero, not_numeric
+	j is_valid					# if got here, is a number (and therefore valid)
+	not_numeric:
+
+		# if A-Z	
+	li $t3, 'A'
+	li $t4, 'Z'
+	slt $t2, $t1, $t3		# if char is less than 'A'
+	beq $t2, $zero, not_upcase
+	slt $t2, $t4, $t1		# if 'Z' is less than char
+	beq	$t2, $zero, not_upcase
+	j is_valid					# if got here, is a number (and therefore valid)
+	not_upcase:
+
+		# if a-z	
+	li $t3, 'a'
+	li $t4, 'z'
+	slt $t2, $t1, $t3		# if char is less than 'a'
+	beq $t2, $zero, not_downcase
+	slt $t2, $t4, $t1		# if 'z' is less than char
+	beq	$t2, $zero, not_downcase
+	j is_valid					# if got here, is a number (and therefore valid)
+	not_downcase:
+
+	j isnt_valid			# if got here, isnt a valid char
+
+	# if is valid char
+	is_valid:
+	sb $t1, 0($t0)		# write char to buffer
+	addi $t0, $t0, 1	# increase write buffer pointer
+	addi $a0, $a0, 1	# increase input string pointer
+	j gld_loop				# read next char
+
+	# else (is invalid char) reset label (reset write pointer & increase read pointer)
+	isnt_valid:
+	la $t0, label_dec_str	# reset write buffer
+	addi $a0, $a0, 1
+	j gld_loop						# read next char
+
+	# reached end of string ('\0') without finding a label
+	string_ended:
+	li $v0, 0							# return false
+	j gld_pop_and_return	# pop & return
+
+	# end label and return
+	end_label:
+	li $v0, 1
+	la $v1, label_dec_str
+
+	gld_pop_and_return:
+	# pop from stack
+	lw $a0,  0($sp)		# used as a pointer to string to be read
+	lw $t0,  4($sp)		# used as a pointer to label being constructed
+	lw $t1,  8($sp)		# used as a temp for char being read
+	lw $t2, 12($sp)		# used as a flag for set less than
+	lw $t3, 16($sp)		# used to store immediate for comparison
+	lw $t4, 20($sp)		# used to store immediate for comparison
+	addi $sp, $sp, 24
+
+	jr $ra	# return
 
 # FUNCAO QUE INSERE UMA STRING (QUE REPRESENTA UMA LABEL) E O ENDEREÇO DA LABEL EM UMA LISTA
 insert_label:
