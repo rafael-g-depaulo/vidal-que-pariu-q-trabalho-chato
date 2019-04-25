@@ -4,6 +4,7 @@ label_dec_str:				.space 	40
 # USED IN "get_label_dec" tests
 linha_teste:					.asciiz "minha_label:   addi $t2, $t2, 9  " 
 linha_teste1:					.asciiz " li $t0, 2 \n\n    \tminha_label:   addi $t2, $t2, 9  " 
+linha_teste2:					.asciiz " li $t0, 2 \n\n    \tminha_label:   addi $t2, $t2, 9.. _kkk_label__%2: $sw $t0, 0($sp)  " 
 
 # USED BY "insert_label"
 label_list:						.word 	0	# ponteiro para o primeiro elemento da lista
@@ -43,9 +44,12 @@ lineend:							.asciiz "linha acabou."
 	# syscall
 
 	# get label dec test
-	la $a0, linha_teste1
+	la $a0, linha_teste2
 	jal get_label_dec
-	
+	# get next label in same line
+	move $a0, $v1
+	jal get_label_dec
+
 	# end program
 	li $v0, 10
 	syscall
@@ -217,7 +221,8 @@ get_label_dec:
 	end_label:
 	sb $zero, 0($t0)			# add a \0 to next char in label write buffer
 	li $v0, 1
-	move $v1, $a0					# return address of next char in string after label
+	addi $v1, $a0, 1			# return address of next char in string after label
+	# move $v1, $a0					# return address of next char in string after label BUG IS HERE< GONNA CHANGE FROM MOVE TO ADD +1. BUG IS THAT ITS STARTING TO READ FROM ':'
 
 	gld_pop_and_return:
 	# pop from stack
