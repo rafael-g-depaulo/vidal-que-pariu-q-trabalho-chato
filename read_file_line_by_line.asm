@@ -127,9 +127,9 @@ print_line:
 	jr $ra # return
 
 # FUNCAO QUE LE UMA STRING, CHECA SE NELA TEM A DEClARACAO DE UMA LABEL, E RETORNA UMA STRING COM O NOME DA LABEL
-### UNTESTED #############
-### UNTESTED #############
-### UNTESTED #############
+### FALTA TESTAR MULTIPLAS LABELS EM UMA LINHA SÓ ####
+### FALTA TESTAR MULTIPLAS LABELS EM UMA LINHA SÓ ####
+### FALTA TESTAR MULTIPLAS LABELS EM UMA LINHA SÓ ####
 get_label_dec:
 # $a0: ponteiro para a string (linha)
 # $v0: 1 se achou uma label, 0 se não achou
