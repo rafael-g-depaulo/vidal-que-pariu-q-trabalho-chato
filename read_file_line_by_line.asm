@@ -2,10 +2,6 @@
 # USED BY "insert_label"
 label_list:						.word 0		# ponteiro para o primeiro elemento da lista
 label_list_end:				.word 0		# ponteiro para o último elemento da lista
-# USED IN TESTS OF "insert_label"
-label1: .asciiz "minha_label"
-label2: .asciiz "label222"
-label3: .asciiz "kkk_super_label"
 
 # USED BY "get_file_name"
 file_name_buffer:   	.space 40
@@ -41,19 +37,6 @@ lineend:							.asciiz "linha acabou."
 	# move $a0, $v0
 	# li $v0, 1
 	# syscall
-
-	# testando insert_label
-	li $a0, 0x0245		# endereço da prox instrucao da label
-	la $a1, label1		# string com o nome da label
-	jal insert_label
-	
-	li $a0, 0x0456		# endereço da prox instrucao da label
-	la $a1, label2		# string com o nome da label
-	jal insert_label
-
-	li $a0, 0x9876		# endereço da prox instrucao da label
-	la $a1, label3		# string com o nome da label
-	jal insert_label
 	
 	# end program
 	li $v0, 10
@@ -136,9 +119,6 @@ print_line:
 	jr $ra # return
 
 # FUNCAO QUE INSERE UMA STRING (QUE REPRESENTA UMA LABEL) E O ENDEREÇO DA LABEL EM UMA LISTA
-########## UNTESTED #########################
-########## UNTESTED #########################
-########## UNTESTED #########################
 insert_label:
 # $a0: número que representa o endereço da próxima instrução após a label
 # $a1: ponteiro para a string que representa a label
