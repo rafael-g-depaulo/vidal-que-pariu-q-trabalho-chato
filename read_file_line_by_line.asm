@@ -1,4 +1,7 @@
 .data
+# USED BY "get_label_use"
+label_use_str:				.space 	40
+
 # USED BY "get_label_dec"
 label_dec_str:				.space 	40
 
@@ -120,12 +123,17 @@ print_line:
 	jr $ra # return
 
 # FUNCAO QUE LE UMA STRING, CHECA SE NELA TEM UMA LABEL SENDO USADA, E RETORNA O VALOR DA LABEL, E UM PONTEIRO PARA LOGO APÓS O USO DELA
+#### UNTESTED ################
+#### UNTESTED ################
+#### UNTESTED ################
 get_label_use:
 # $a0: ponteiro para a string (linha)
 # $v0: valor da label (0 se não achou)
 # $v1: ponteiro para o próximo char depois do último caracter da label na string recebida em $a1
 
 	# push to stack t0-4, a0, ra
+
+	la $t0, label_use_str	# set up write buffer pointer
 
 	# navigate the line until a non ',', non whitespace char appears
 	glu_loop1:
@@ -136,7 +144,8 @@ get_label_use:
 	beq $t1, '\t', glu_loop1	# if whitespace, keep looking
 	beq $t1, '\n', glu_loop1	# if whitespace, keep looking
 	# if reached here, found first char of label.
-	sw $t1, 0($t0)						# write first char to buffer
+	sb $t1, 0($t0)						# write first char to buffer
+	addi $t0, $t0, 1					# update write pointer
 
 	# now add the next chars into buffer, until a non-valid char is found
 	glu_loop:
@@ -186,6 +195,7 @@ get_label_use:
 
 	# else (is invalid char) finish label
 	isnt_valid:
+	sb $zero, 0($t0)	# add '\0' at the end of buffer
 
 	# now look for which label it is in the list
 	find_label_loop:
