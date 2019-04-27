@@ -2,9 +2,6 @@
 # USED BY "get_label_use"
 label_use_str:				.space 	40
 
-label_to_add1:				.asciiz "my_label"
-label_to_add2:				.asciiz "my_label2"
-
 # USED BY "get_label_dec"
 label_dec_str:				.space 	40
 
@@ -126,9 +123,6 @@ print_line:
 	jr $ra # return
 
 # FUNCAO QUE LE UMA STRING, CHECA SE NELA TEM UMA LABEL SENDO USADA, E RETORNA O VALOR DA LABEL, E UM PONTEIRO PARA LOGO APÓS O USO DELA
-#### UNTESTED ################
-#### UNTESTED ################
-#### UNTESTED ################
 get_label_use:
 # $a0: ponteiro para a string (linha)
 # $v0: valor da label (0 se não achou)
