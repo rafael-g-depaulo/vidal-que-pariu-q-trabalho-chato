@@ -1,4 +1,7 @@
 .data
+# USED TO TEST "get_imm"
+imm_test:							.asciiz "  ,    67,-234, \t\t\n  0x34FF5 -0xaBeD3"
+
 # USED BY "get_label_use"
 label_use_str:				.space 	40
 
@@ -42,6 +45,23 @@ lineend:							.asciiz "linha acabou."
 	# li $v0, 1
 	# syscall
 
+	# testing get_imm
+	la $a0, imm_test
+	jal get_imm
+	move $s0, $v0
+	move $a0, $v1
+
+	jal get_imm
+	move $s1, $v0
+	move $a0, $v1
+
+	jal get_imm
+	move $s2, $v0
+	move $a0, $v1
+	
+	jal get_imm
+	move $s3, $v0
+	
 	# end program
 	li $v0, 10
 	syscall
@@ -124,46 +144,44 @@ print_line:
 
 # FUNCAO QUE LE UMA STRING, CHECA SE NELA TEM UM IMEDIATO SENDO USADO, E RETORNA O VALOR DA LABEL,
 #   E UM PONTEIRO PARA LOGO APÓS O USO DELE
-###### UNTESTED ###########
-###### UNTESTED ###########
-###### UNTESTED ###########
-###### UNTESTED ###########
-###### UNTESTED ###########
 get_imm:
 # $a0: ponteiro para a string (linha)
 # $v0: valor do imediato
 # $v1: ponteiro para o próximo char depois do último caracter da label na string recebida em $a1
 
 	# push to stack
-	subi $sp, $sp, 24
+	subi $sp, $sp, 28
 	sw $a0,  0($sp)			# used as a pointer to line string
-	sw $t1,  4($sp)			# used to store the digit read from $a0, and to check if number is hex
-	sw $t2,  8($sp)			# used to store constants for comparison, and to check if number is hex
-	sw $t3, 12($sp)			# used to store constants for comparison
-	sw $t4, 16($sp)			# used to store constants for comparison
-	sw $t7, 20($sp)			# used for negative number flag
+	sw $t0,  4($sp)			# used to check if number is hex
+	sw $t1,  8($sp)			# used to store the digit read from $a0, and to check if number is hex
+	sw $t2, 12($sp)			# used to store constants for comparison, and to check if number is hex
+	sw $t3, 16($sp)			# used to store constants for comparison
+	sw $t4, 20($sp)			# used to store constants for comparison
+	sw $t7, 24($sp)			# used for negative number flag
 
 	# navigate the line until a non ',', non whitespace char appears
+	gi_loop:
 	lbu $t1, 0($a0)						# read char
 	addi $a0, $a0, 1					# increase pointer
-	beq $t1, ',' , gi_loop1		# if whitespace, keep looking
-	beq $t1, ' ' , gi_loop1		# if whitespace, keep looking
-	beq $t1, '\t', gi_loop1		# if whitespace, keep looking
-	beq $t1, '\n', gi_loop1		# if whitespace, keep looking
+	beq $t1, ',' , gi_loop		# if whitespace, keep looking
+	beq $t1, ' ' , gi_loop		# if whitespace, keep looking
+	beq $t1, '\t', gi_loop		# if whitespace, keep looking
+	beq $t1, '\n', gi_loop		# if whitespace, keep looking
 	
 	bne $t1, '-', gi_not_neg	# if it's negative, set up a flag
 	li $t7, 1									# flag that makes the number negative
-	addi $a0, $a0, 1					# increase line pointer
-
+	addi $a0, $a0, 1					# increase pointer
+	
 	gi_not_neg:
+	subi $a0, $a0, 1					# pointer is pointing to digit after first. fix that by subtracting 1
+	
 	# now check if its a hex or dec number
-	lw $t1, 0($a0)
-	srl $t2, $t1, 8 # align the 2nd byte to be the new lsb
-	andi $t1, $t1, 0x000000FF		# 1st character
-	andi $t2, $t2, 0x000000FF		# 2nd character
-	bne $t1, '0', gi_dec				# if doesnt start with '0x'...
+	lbu $t0, 0($a0)							# 1st character
+	lbu $t2, 1($a0)							# 2nd character
+	bne $t0, '0', gi_dec				# if doesnt start with '0x'...
 	bne $t2, 'x', gi_dec				# ... its a decimal number
 	# else, it's hex
+	addi $a0, $a0, 2						# go for after the '0x' to start reading
 	
 	# HEXADECIMAL
 	li $v0, 0									# start
@@ -209,7 +227,7 @@ get_imm:
 
 	gi_hex_valid_digit:
 	# confirmed that $t1 hold a digit
-	mul $v0, $v0, 10		# multiply number by 10
+	sll $v0, $v0, 4		# multiply number by 16
 	add $v0, $v0, $t1		# add t1's value to $v0
 
 	addi $a0, $a0, 1		# increase line pointer (to get next digit)
@@ -226,7 +244,6 @@ get_imm:
 	# DECIMAL
 	gi_dec:
 	li $v0, 0									# start 
-
 	gi_dec_loop:
 	lbu $t1, 0($a0)						# get digit
 
@@ -256,12 +273,13 @@ get_imm:
 	# pop from stack
 	gi_pop_and_return:
 	lw $a0,  0($sp)			# used as a pointer to line string
-	lw $t1,  4($sp)			# used to store the digit read from $a0, and to check if number is hex
-	lw $t2,  8($sp)			# used to store constants for comparison, and to check if number is hex
-	lw $t3, 12($sp)			# used to store constants for comparison
-	lw $t4, 16($sp)			# used to store constants for comparison
-	lw $t7, 20($sp)			# used for negative number flag
-	addi $sp, $sp, 24
+	lw $t0,  4($sp)			# used to check if number is hex
+	lw $t1,  8($sp)			# used to store the digit read from $a0, and to check if number is hex
+	lw $t2, 12($sp)			# used to store constants for comparison, and to check if number is hex
+	lw $t3, 16($sp)			# used to store constants for comparison
+	lw $t4, 20($sp)			# used to store constants for comparison
+	lw $t7, 24($sp)			# used for negative number flag
+	addi $sp, $sp, 28
 
 	jr $ra	# return
 
