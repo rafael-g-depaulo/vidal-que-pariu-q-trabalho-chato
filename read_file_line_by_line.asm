@@ -119,7 +119,81 @@ print_line:
 	
 	jr $ra # return
 
+# FUNCAO QUE LE UMA STRING, CHECA SE NELA TEM UMA LABEL SENDO USADA, E RETORNA O VALOR DA LABEL, E UM PONTEIRO PARA LOGO APÓS O USO DELA
+get_label_use:
+# $a0: ponteiro para a string (linha)
+# $v0: valor da label (0 se não achou)
+# $v1: ponteiro para o próximo char depois do último caracter da label na string recebida em $a1
 
+	# push to stack t0-4, a0, ra
+
+	# navigate the line until a non ',', non whitespace char appears
+	glu_loop1:
+	lbu $t1, 0($a0)						# read char
+	addi $a0, $a0, 1					# increase pointer
+	beq $t1, ',' , glu_loop1	# if whitespace, keep looking
+	beq $t1, ' ' , glu_loop1	# if whitespace, keep looking
+	beq $t1, '\t', glu_loop1	# if whitespace, keep looking
+	beq $t1, '\n', glu_loop1	# if whitespace, keep looking
+	# if reached here, found first char of label.
+	sw $t1, 0($t0)						# write first char to buffer
+
+	# now add the next chars into buffer, until a non-valid char is found
+	glu_loop:
+	lbu $t1, 0($a0)					# read char from line
+
+	# if char is valid (a-zA-Z0-9_%$) write to label buffer
+		# valid symbols
+	beq $t1, '_', is_valid
+	beq $t1, '$', is_valid
+	beq $t1, '%', is_valid	
+		# if 0-9
+	li $t3, '0'
+	li $t4, '9'
+	slt $t2, $t1, $t3		# if char is less than '0'
+	bne $t2, $zero, not_numeric
+	slt $t2, $t4, $t1		# if '9' is less than char
+	bne	$t2, $zero, not_numeric
+	j is_valid					# if got here, is a number (and therefore valid)
+	not_numeric:
+		# if A-Z	
+	li $t3, 'A'
+	li $t4, 'Z'
+	slt $t2, $t1, $t3		# if char is less than 'A'
+	bne $t2, $zero, not_upcase
+	slt $t2, $t4, $t1		# if 'Z' is less than char
+	bne	$t2, $zero, not_upcase
+	j is_valid					# if got here, is a number (and therefore valid)
+	not_upcase:
+		# if a-z	
+	li $t3, 'a'
+	li $t4, 'z'
+	slt $t2, $t1, $t3		# if char is less than 'a'
+	bne $t2, $zero, not_downcase
+	slt $t2, $t4, $t1		# if 'z' is less than char
+	bne	$t2, $zero, not_downcase
+	j is_valid					# if got here, is a number (and therefore valid)
+	not_downcase:
+
+	j isnt_valid			# if got here, isnt a valid char
+
+	# if is valid char
+	is_valid:
+	sb $t1, 0($t0)		# write char to buffer
+	addi $t0, $t0, 1	# increase write buffer pointer
+	addi $a0, $a0, 1	# increase input string pointer
+	j glu_loop				# read next char
+
+	# else (is invalid char) finish label
+	isnt_valid:
+
+	# now look for which label it is in the list
+	find_label_loop:
+	jal string_compare
+
+	# pop from stack & return
+
+	jr $ra
 
 # FUNCAO QUE LE UMA STRING, CHECA SE NELA TEM A DEClARACAO DE UMA LABEL, E RETORNA UMA STRING COM O NOME DA LABEL
 get_label_dec:
