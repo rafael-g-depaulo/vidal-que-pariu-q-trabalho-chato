@@ -1,11 +1,6 @@
 .data
 # USED BY "get_label_use"
 label_use_str:				.space 	40
-# USED TO TEST "get_label_use
-label_use_line1:			.asciiz ", my_label "				# followed by whitespace
-label_use_line2:			.asciiz ",\t my_label\n "		# followed by '\n'
-label_use_line3:			.asciiz ",\n my_label2"			# followed by '\0'
-label_use_line4:			.asciiz ",    my_label,  "	# followed by ','
 
 label_to_add1:				.asciiz "my_label"
 label_to_add2:				.asciiz "my_label2"
@@ -50,27 +45,6 @@ lineend:							.asciiz "linha acabou."
 	# li $v0, 1
 	# syscall
 
-# testando get_label_use	
-	# adicionando a label1
-	li $a0, 0xCC
-	la $a1, label_to_add1
-	jal insert_label
-
-	# adicionando a label2
-	li $a0, 0x99
-	la $a1, label_to_add2
-	jal insert_label
-
-	# testando achar o uso das labels
-	la $a0, label_use_line1
-	jal get_label_use
-	la $a0, label_use_line2
-	jal get_label_use
-	la $a0, label_use_line3
-	jal get_label_use
-	la $a0, label_use_line4
-	jal get_label_use
-	
 	# end program
 	li $v0, 10
 	syscall
