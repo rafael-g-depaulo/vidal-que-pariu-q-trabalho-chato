@@ -1,9 +1,4 @@
 .data
-# USED TO TEST "str_compare"
-str1:									.asciiz "test1"
-str2:									.asciiz "test1"
-str3:									.asciiz "testt1"
-
 # USED BY "get_label_use"
 label_use_str:				.space 	40
 
@@ -46,15 +41,6 @@ lineend:							.asciiz "linha acabou."
 	# move $a0, $v0
 	# li $v0, 1
 	# syscall
-	
-	# str_compare test
-	la $a0, str1			# "test1"
-	la $a1, str2			# "test1"
-	jal str_compare		# should return true
-	
-	la $a0, str2			# "test1"
-	la $a1, str3			# "testt1"
-	jal str_compare		# should return false
 		
 	# end program
 	li $v0, 10
