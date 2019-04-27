@@ -605,4 +605,227 @@ line_done:
 
 # END OF FUNCTION
 
+######## FUNCAO PARA ACHAR O NUMERO DE UM REGISTRADOR
+# t0 = endereco de algum ponto da string antes do reg
+# t1 = em primeira instancia, o primeiro digito do reg. apos verificar de qual 'familia' o reg e, 
+#	t1 vai ser o comparador do segundo digito (economia de reg
+# t2 = na primeira parte, sera o comparador do primeiro digito do reg
+# t3 = vai guardar o segundo digito do reg
+# v0 = retorno com o valor (numero) do reg
+# v1 = retorno com o endereco na string apos o reg
+#
+
+get_reg:
+	addi $sp, $sp, -16   	####
+	sw $t0, 0($sp)		# preparando a stack
+	sw $t1, 4($sp)		#
+	sw $t2, 8($sp)		#
+	sw $t3, 12($sp)		####
+
+# do funct
+	addi $t2, $zero, '$'	# $t2 = '$', para comparar e checar se encontrou um reg
+	
+GRloop:
+	lbu $t1, 0($t0)			#	ler char por char (byte por byte) | $t1 = um byte (char) da string
+	addi $t0, $t0, 1		# próximo byte
+	bne $t2, $t1, GRloop 		# enquanto eu nao encontrar um '$' eu continuo procurando
+	
+	lbu $t1, 0($t0)			#	ler char depois do '$' para checar qual reg usado
+	addi $t0, $t0, 1		# próximo byte
+	
+	lbu $t3, 0($t0)			# 	para evitar repeticoes, ja guardo aqui o segundo
+	addi $t0, $t0, 1		# digito do reg, e o endereco de retorno logo apos o reg (em t3).
+	add $v1, $zero, $t0		# v1 ja tem o endereco de retorno apos o reg
+	
+	addi $t2, $zero, 'v'	####
+	beq $t1, $t2, GRfamV	#
+	addi $t2, $zero, 'a'	#
+	beq $t1, $t2, GRfamA	#
+	addi $t2, $zero, 't'	# 	checa se o reg e da familia 'n', e manda pra
+	beq $t1, $t2, GRfamT	# outro teste checar qual dos reg dessa familia 'n'
+	addi $t2, $zero, 's'	#
+	beq $t1, $t2, GRfamS	#
+	addi $t2, $zero, 'k'	#
+	beq $t1, $t2, GRfamK	####
+	
+	addi $t2, $zero, 'r'	####
+	beq $t1, $t2, GRfamR	#
+	addi $t2, $zero, 'g'	#
+	beq $t1, $t2, GRfamG	#
+	addi $t2, $zero, 'f'	#	caso so tenha um reg na 
+	beq $t1, $t2, GRfamF	# familia 'n', nao ha mais testes.
+	addi $t2, $zero, 'z'	# so atribui o v0 e encerra a funcao.
+	beq $t1, $t2, GRfamZ	####
+
+# 	como a informacao em t1 nao e mais relevante, vou alterar seu
+#	valor para encontrar qual dos membros da familia 'n' e o reg atual.
+
+	GRfamR:
+		addi $v0, $zero, 31
+		j end_get_reg	
+	GRfamG:
+		addi $v0, $zero, 28
+		j end_get_reg	
+	GRfamF:
+		addi $v0, $zero, 30
+		j end_get_reg
+	GRfamZ:
+		addi $v1, $v1, 2	# o v1 guarda o endereco duas casas apos o '$', mas o zero e o unico reg com 4 casas. hence this
+		addi $v0, $zero, 0
+		j end_get_reg
+	###### famV
+	GRfamV:
+		addi $t1, $zero, '0'	# t1 = 0, para testar se e o reg v0
+		beq $t1, $t3, GRV0	# se for igual, o reg e v0, retorna valor 2 no v0 (retorno da func)
+		addi $v0, $zero, 3	# se t3 nao for 0, so pode ser 1, entao e o reg v1. retorno da func sera 3
+		j end_get_reg
+	GRV0: 
+		addi $v0, $zero, 2
+		j end_get_reg
+	###### end famV
+	###### famA
+	GRfamA:
+		addi $t1, $zero, 't'
+		beq $t1, $t3, GRAT	# checando se o t3 tem um 't' nele, se sim, e o reg at... e por ai vai
+		addi $t1, $zero, '0'
+		beq $t1, $t3, GRA0
+		addi $t1, $zero, '1'
+		beq $t1, $t3, GRA1
+		addi $t1, $zero, '2'
+		beq $t1, $t3, GRA2	# se passou de todos os testes, a unica possibilidade e o a3, valor 7
+		addi $v0, $zero, 7
+		j end_get_reg
+
+		GRAT:
+			addi $v0, $zero, 1
+			j end_get_reg
+		GRA0:
+			addi $v0, $zero, 4
+			j end_get_reg
+		GRA1:
+			addi $v0, $zero, 5
+			j end_get_reg
+		GRA2:
+			addi $v0, $zero, 6
+			j end_get_reg	
+	###### end famA
+	###### famT
+	GRfamT:
+		addi $t1, $zero, '0'	# checa qual da familia do 't' é o reg atual... e por ai vai
+		beq $t1, $t3, GRT0
+		addi $t1, $zero, '1'
+		beq $t1, $t3, GRT1
+		addi $t1, $zero, '2'
+		beq $t1, $t3, GRT2
+		addi $t1, $zero, '3'
+		beq $t1, $t3, GRT3
+		addi $t1, $zero, '4'
+		beq $t1, $t3, GRT4
+		addi $t1, $zero, '5'
+		beq $t1, $t3, GRT5
+		addi $t1, $zero, '6'
+		beq $t1, $t3, GRT6
+		addi $t1, $zero, '7'
+		beq $t1, $t3, GRT7
+		addi $t1, $zero, '8'	# se nao passar em nenhum caso até agora, a unica possibilidade e ser o t9
+		beq $t1, $t3, GRT8
+		addi $v0, $zero, 25
+		j end_get_reg
+		
+		GRT0:
+			addi $v0, $zero, 8
+			j end_get_reg
+		GRT1:
+			addi $v0, $zero, 9
+			j end_get_reg
+		GRT2:
+			addi $v0, $zero, 10
+			j end_get_reg
+		GRT3:
+			addi $v0, $zero, 11
+			j end_get_reg
+		GRT4:
+			addi $v0, $zero, 12
+			j end_get_reg
+		GRT5:
+			addi $v0, $zero, 13
+			j end_get_reg
+		GRT6:
+			addi $v0, $zero, 14
+			j end_get_reg
+		GRT7:
+			addi $v0, $zero, 15
+			j end_get_reg
+		GRT8:
+			addi $v0, $zero, 24
+			j end_get_reg
+	###### end famT
+	###### famS
+	GRfamS:
+		addi $t1, $zero, 'p'
+		beq $t1, $t3, GRSP
+		addi $t1, $zero, '0'
+		beq $t1, $t3, GRS0
+		addi $t1, $zero, '1'
+		beq $t1, $t3, GRS1
+		addi $t1, $zero, '2'
+		beq $t1, $t3, GRS2
+		addi $t1, $zero, '3'
+		beq $t1, $t3, GRS3
+		addi $t1, $zero, '4'
+		beq $t1, $t3, GRS4
+		addi $t1, $zero, '5'
+		beq $t1, $t3, GRS5
+		addi $t1, $zero, '6'	# de novo, se falha em todos os casos ate agr, so sobra o s7 de possibilidade
+		beq $t1, $t3, GRS6
+		addi $v0, $zero, 23
+		j end_get_reg
+		
+		GRSP:
+			addi $v0, $zero, 29
+			j end_get_reg
+		GRS0:
+			addi $v0, $zero, 16
+			j end_get_reg		
+		GRS1:
+			addi $v0, $zero, 17
+			j end_get_reg
+		GRS2:
+			addi $v0, $zero, 18
+			j end_get_reg
+		GRS3:
+			addi $v0, $zero, 19
+			j end_get_reg
+		GRS4:
+			addi $v0, $zero, 20
+			j end_get_reg
+		GRS5:
+			addi $v0, $zero, 21
+			j end_get_reg
+		GRS6:
+			addi $v0, $zero, 22
+			j end_get_reg
+	###### end famS
+	###### famK
+	GRfamK:
+		addi $t1, $zero,'0' 
+		beq $t1, $t3, GRK0		# se nao for k0, a unica possibilidade e k1
+		addi $v0, $zero, 27
+		j end_get_reg
+		
+		GRK0:
+			addi $v0, $zero, 26
+			j end_get_reg
+	###### end famK
+	
+# done funct
+	
+end_get_reg:				# ao chegar aq, v0 = numero do reg, v1 = endereco da string logo apos o reg
+	lw $t3, 12($sp)			####
+	lw $t2, 8($sp)			#
+	lw $t1, 4($sp)			# retornando a stack
+	lw $t0, 0($sp)			#
+	addi $sp, $sp, 16		####
+######## fim da funcao pra achar o numero do registrador
+
 # read file code from https://stackoverflow.com/questions/37469323/assembly-mips-read-text-from-file-and-buffer/37505359#37505359
