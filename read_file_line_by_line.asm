@@ -1,6 +1,14 @@
 .data
 # USED BY "get_label_use"
 label_use_str:				.space 	40
+# USED TO TEST "get_label_use
+label_use_line1:			.asciiz ", my_label "				# followed by whitespace
+label_use_line2:			.asciiz ",\t my_label\n "		# followed by '\n'
+label_use_line3:			.asciiz ",\n my_label2"			# followed by '\0'
+label_use_line4:			.asciiz ",    my_label,  "	# followed by ','
+
+label_to_add1:				.asciiz "my_label"
+label_to_add2:				.asciiz "my_label2"
 
 # USED BY "get_label_dec"
 label_dec_str:				.space 	40
@@ -41,7 +49,28 @@ lineend:							.asciiz "linha acabou."
 	# move $a0, $v0
 	# li $v0, 1
 	# syscall
-		
+
+# testando get_label_use	
+	# adicionando a label1
+	li $a0, 0xCC
+	la $a1, label_to_add1
+	jal insert_label
+
+	# adicionando a label2
+	li $a0, 0x99
+	la $a1, label_to_add2
+	jal insert_label
+
+	# testando achar o uso das labels
+	la $a0, label_use_line1
+	jal get_label_use
+	la $a0, label_use_line2
+	jal get_label_use
+	la $a0, label_use_line3
+	jal get_label_use
+	la $a0, label_use_line4
+	jal get_label_use
+	
 	# end program
 	li $v0, 10
 	syscall
@@ -164,9 +193,9 @@ get_label_use:
 
 	# if char is valid (a-zA-Z0-9_%$) write to label buffer
 		# valid symbols
-	beq $t1, '_', is_valid
-	beq $t1, '$', is_valid
-	beq $t1, '%', is_valid	
+	beq $t1, '_', glu_is_valid
+	beq $t1, '$', glu_is_valid
+	beq $t1, '%', glu_is_valid	
 		# if 0-9
 	li $t3, '0'
 	li $t4, '9'
@@ -174,7 +203,7 @@ get_label_use:
 	bne $t2, $zero, glu_not_numeric
 	slt $t2, $t4, $t1		# if '9' is less than char
 	bne	$t2, $zero, glu_not_numeric
-	j is_valid					# if got here, is a number (and therefore valid)
+	j glu_is_valid			# if got here, is a number (and therefore valid)
 	glu_not_numeric:
 		# if A-Z	
 	li $t3, 'A'
@@ -183,7 +212,7 @@ get_label_use:
 	bne $t2, $zero, glu_not_upcase
 	slt $t2, $t4, $t1		# if 'Z' is less than char
 	bne	$t2, $zero, glu_not_upcase
-	j is_valid					# if got here, is a number (and therefore valid)
+	j glu_is_valid			# if got here, is a number (and therefore valid)
 	glu_not_upcase:
 		# if a-z	
 	li $t3, 'a'
@@ -192,10 +221,10 @@ get_label_use:
 	bne $t2, $zero, glu_not_downcase
 	slt $t2, $t4, $t1		# if 'z' is less than char
 	bne	$t2, $zero, glu_not_downcase
-	j is_valid					# if got here, is a number (and therefore valid)
+	j glu_is_valid			# if got here, is a number (and therefore valid)
 	glu_not_downcase:
 
-	j isnt_valid			# if got here, isnt a valid char
+	j glu_isnt_valid		# if got here, isnt a valid char
 
 	# if is valid char
 	glu_is_valid:
@@ -226,12 +255,14 @@ get_label_use:
 	glu_found_label:
 	lw $v0, 4($s0)	# get label address value
 	move $v1, $s1		# get pointer to after label_str ended in line
+	j glu_pop_and_return
 
 	# reached the end of label_list and no match was found
 	glu_l_ended:
 	li $v0, 0
 
 	# pop from stack & return
+	glu_pop_and_return:
 	lw $a0,  0($sp)					# used to navigate the line string given as argument
 	lw $a1,  4($sp)					# used to call str_compare
 	lw $s0,  8($sp)					# used to traverse label_list
