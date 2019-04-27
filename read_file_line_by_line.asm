@@ -826,6 +826,8 @@ end_get_reg:				# ao chegar aq, v0 = numero do reg, v1 = endereco da string logo
 	lw $t1, 4($sp)			# retornando a stack
 	lw $t0, 0($sp)			#
 	addi $sp, $sp, 16		####
+	
+	jr $ra
 ######## fim da funcao pra achar o numero do registrador
 
 # read file code from https://stackoverflow.com/questions/37469323/assembly-mips-read-text-from-file-and-buffer/37505359#37505359
