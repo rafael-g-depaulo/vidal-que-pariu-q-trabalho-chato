@@ -131,9 +131,20 @@ get_label_use:
 # $v0: valor da label (0 se não achou)
 # $v1: ponteiro para o próximo char depois do último caracter da label na string recebida em $a1
 
-	# push to stack t0-4, a0, ra
+	# push to stack
+	subi $sp, $sp, 40
+	sw $a0,  0($sp)					# used to navigate the line string given as argument
+	sw $a1,  4($sp)					# used to call str_compare
+	sw $s0,  8($sp)					# used to traverse label_list
+	sw $s1, 12($sp)					# used to store pointer to next char after end of label in line string
+	sw $t0, 16($sp)					# used as a ponter to the write buffer, to construct the label being read
+	sw $t1, 20($sp)					# used to store chars for comparison
+	sw $t2, 24($sp)					# used as flag in comparisons of chars
+	sw $t3, 28($sp)					# used to store lower bound immediates for char comparison
+	sw $t4, 32($sp)					# used to store upper bound immediates for char comparison
+	sw $ra, 36($sp)					# used for function calls
 
-	la $t0, label_use_str	# set up write buffer pointer
+	la $t0, label_use_str		# set up write buffer pointer
 
 	# navigate the line until a non ',', non whitespace char appears
 	glu_loop1:
@@ -196,12 +207,42 @@ get_label_use:
 	# else (is invalid char) finish label
 	glu_isnt_valid:
 	sb $zero, 0($t0)	# add '\0' at the end of buffer
+	move $s1, $a0			# save pointer to after label ended
 
 	# now look for which label it is in the list
+	# OBS: it's in format pointer_to_next(4)|address(4)|label_string(X)
+	la $s0, label_list	# get first element in label list
+	la $a1, label_use_str						# pointer to label found
 	find_label_loop:
-	jal str_compare
+	beq $s0, $zero, glu_l_ended			# if current list element is null
+	addi $a0, $s0, 8								# pointer to current label in list
+	jal str_compare									# check if the strings have the same value
+	bne $v0, $zero, glu_found_label	# if found a match, got the right label
+	# if got here, not found yet
+	lw $s0, 0($s0)			# get next list element
+	j find_label_loop		# check next list element
+
+	# if got here, then the str in $t0 is the same as the label in $s0+8
+	glu_found_label:
+	lw $v0, 4($s0)	# get label address value
+	move $v1, $s1		# get pointer to after label_str ended in line
+
+	# reached the end of label_list and no match was found
+	glu_l_ended:
+	li $v0, 0
 
 	# pop from stack & return
+	lw $a0,  0($sp)					# used to navigate the line string given as argument
+	lw $a1,  4($sp)					# used to call str_compare
+	lw $s0,  8($sp)					# used to traverse label_list
+	lw $s1, 12($sp)					# used to store pointer to next char after end of label in line string
+	lw $t0, 16($sp)					# used as a ponter to the write buffer, to construct the label being read
+	lw $t1, 20($sp)					# used to store chars for comparison
+	lw $t2, 24($sp)					# used as flag in comparisons of chars
+	lw $t3, 28($sp)					# used to store lower bound immediates for char comparison
+	lw $t4, 32($sp)					# used to store upper bound immediates for char comparison
+	lw $ra, 36($sp)					# used for function calls
+	subi $sp, $sp, 40
 
 	jr $ra
 
@@ -352,6 +393,10 @@ insert_label:
 # $a0: número que representa o endereço da próxima instrução após a label
 # $a1: ponteiro para a string que representa a label
 # $v0: address of new element
+# OBS: formato do elemento da lista eh:
+# 4 bytes: pointer to next list element (0 if last one)
+# 4 bytes: the label's corresponding value
+# up to '\0': the string representing the label
 
 	# push to stack
 	subi $sp, $sp, 32
