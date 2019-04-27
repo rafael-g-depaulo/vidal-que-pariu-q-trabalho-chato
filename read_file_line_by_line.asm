@@ -122,6 +122,147 @@ print_line:
 	
 	jr $ra # return
 
+# FUNCAO QUE LE UMA STRING, CHECA SE NELA TEM UM IMEDIATO SENDO USADO, E RETORNA O VALOR DA LABEL,
+#   E UM PONTEIRO PARA LOGO APÓS O USO DELE
+get_imm:
+# $a0: ponteiro para a string (linha)
+# $v0: valor do imediato
+# $v1: ponteiro para o próximo char depois do último caracter da label na string recebida em $a1
+
+	# push to stack
+	subi $sp, $sp, 28
+	sw $a0,  0($sp)			# used as a pointer to line string
+	sw $t0,  4($sp)			# used to check if number is hex
+	sw $t1,  8($sp)			# used to store the digit read from $a0, and to check if number is hex
+	sw $t2, 12($sp)			# used to store constants for comparison, and to check if number is hex
+	sw $t3, 16($sp)			# used to store constants for comparison
+	sw $t4, 20($sp)			# used to store constants for comparison
+	sw $t7, 24($sp)			# used for negative number flag
+
+	# navigate the line until a non ',', non whitespace char appears
+	gi_loop:
+	lbu $t1, 0($a0)						# read char
+	addi $a0, $a0, 1					# increase pointer
+	beq $t1, ',' , gi_loop		# if whitespace, keep looking
+	beq $t1, ' ' , gi_loop		# if whitespace, keep looking
+	beq $t1, '\t', gi_loop		# if whitespace, keep looking
+	beq $t1, '\n', gi_loop		# if whitespace, keep looking
+	
+	bne $t1, '-', gi_not_neg	# if it's negative, set up a flag
+	li $t7, 1									# flag that makes the number negative
+	addi $a0, $a0, 1					# increase pointer
+	
+	gi_not_neg:
+	subi $a0, $a0, 1					# pointer is pointing to digit after first. fix that by subtracting 1
+	
+	# now check if its a hex or dec number
+	lbu $t0, 0($a0)							# 1st character
+	lbu $t2, 1($a0)							# 2nd character
+	bne $t0, '0', gi_dec				# if doesnt start with '0x'...
+	bne $t2, 'x', gi_dec				# ... its a decimal number
+	# else, it's hex
+	addi $a0, $a0, 2						# go for after the '0x' to start reading
+	
+	# HEXADECIMAL
+	li $v0, 0									# start
+
+	gi_hex_loop:
+	lbu $t1, 0($a0)						# get digit
+
+	# check if digit is 'a'-'f'
+	li $t3, 'a'
+	li $t4, 'f'
+	slt $t2, $t1, $t3			# if digit is less than 'a'
+	bne $t2, $zero, gi_hex_not_lowcase
+	slt $t2, $t4, $t1			# if '9' is less than digit
+	bne	$t2, $zero, gi_hex_not_lowcase
+	# se chegou aqui, esta em 'a'-'f'
+	subi $t1, $t1, 'a'		# transforma t de 'a'-'f' pra 0-5
+	addi $t1, $t1, 10			# transforma t de 0-5 pra 10-15
+	j gi_hex_valid_digit	# adicione o digito ao numero
+	gi_hex_not_lowcase:
+
+	# check if digit is 'A'-'F'
+	li $t3, 'A'
+	li $t4, 'F'
+	slt $t2, $t1, $t3			# if digit is less than 'A'
+	bne $t2, $zero, gi_hex_not_upcase
+	slt $t2, $t4, $t1			# if '9' is less than digit
+	bne	$t2, $zero, gi_hex_not_upcase
+	# se chegou aqui, esta em 'a'-'f'
+	subi $t1, $t1, 'A'		# transforma t de 'A'-'F' pra 0-5
+	addi $t1, $t1, 10			# transforma t de 0-5 pra 10-15
+	j gi_hex_valid_digit	# adicione o digito ao numero
+	gi_hex_not_upcase:
+	
+	# check if digit is 0-9
+	li $t3, '0'
+	li $t4, '9'
+	slt $t2, $t1, $t3		# if digit is less than '0'
+	bne $t2, $zero, gi_hex_num_ended
+	slt $t2, $t4, $t1		# if '9' is less than digit
+	bne	$t2, $zero, gi_hex_num_ended
+	# se chegou aqui, esta em '0'-'9'
+	subi $t1, $t1, '0'	# transforma t de '0'-'9' pra 0-9
+
+	gi_hex_valid_digit:
+	# confirmed that $t1 hold a digit
+	sll $v0, $v0, 4		# multiply number by 16
+	add $v0, $v0, $t1		# add t1's value to $v0
+
+	addi $a0, $a0, 1		# increase line pointer (to get next digit)
+	j gi_hex_loop				# get next digit
+
+	gi_hex_num_ended:
+	move $v1, $a0				# load return pointer (points to right after number)
+	beq $t7, $zero, gi_hex_not_neg	# if not negative, dont negate
+	not $v0, $v0				# invert
+	addi $v0, $v0, 1		# add 1
+	gi_hex_not_neg:
+	j gi_pop_and_return	# pop & return
+
+	# DECIMAL
+	gi_dec:
+	li $v0, 0									# start 
+	gi_dec_loop:
+	lbu $t1, 0($a0)						# get digit
+
+	# if char isnt valid, end number
+	li $t3, '0'
+	li $t4, '9'
+	slt $t2, $t1, $t3		# if digit is less than '0'
+	bne $t2, $zero, gi_dec_num_ended
+	slt $t2, $t4, $t1		# if '9' is less than digit
+	bne	$t2, $zero, gi_dec_num_ended
+	
+	# confirmed that $t1 hold a digit
+	subi $t1, $t1, '0'	# conver t1 from char to int
+	mul $v0, $v0, 10		# multiply number by 10
+	add $v0, $v0, $t1		# add t1's value to $v0
+
+	addi $a0, $a0, 1		# increase line pointer (to get next digit)
+	j gi_dec_loop				# get next digit
+
+	gi_dec_num_ended:
+	move $v1, $a0				# load return pointer (points to right after number)
+	beq $t7, $zero, gi_dec_not_neg	# if not negative, dont negate
+	not $v0, $v0				# invert
+	addi $v0, $v0, 1		# add 1
+	gi_dec_not_neg:
+	
+	# pop from stack
+	gi_pop_and_return:
+	lw $a0,  0($sp)			# used as a pointer to line string
+	lw $t0,  4($sp)			# used to check if number is hex
+	lw $t1,  8($sp)			# used to store the digit read from $a0, and to check if number is hex
+	lw $t2, 12($sp)			# used to store constants for comparison, and to check if number is hex
+	lw $t3, 16($sp)			# used to store constants for comparison
+	lw $t4, 20($sp)			# used to store constants for comparison
+	lw $t7, 24($sp)			# used for negative number flag
+	addi $sp, $sp, 28
+
+	jr $ra	# return
+
 # FUNCAO QUE LE UMA STRING, CHECA SE NELA TEM UMA LABEL SENDO USADA, E RETORNA O VALOR DA LABEL, E UM PONTEIRO PARA LOGO APÓS O USO DELA
 get_label_use:
 # $a0: ponteiro para a string (linha)
