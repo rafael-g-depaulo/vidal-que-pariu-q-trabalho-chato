@@ -205,6 +205,49 @@ get_label_use:
 
 	jr $ra
 
+# FUNCAO QUE COMPARA 2 STRINGS E CHECA SE SÃO IGUAIS
+#### UNTESTED ############
+#### UNTESTED ############
+#### UNTESTED ############
+#### UNTESTED ############
+str_compare:		# TODO: test this
+# $a0: ponteiro para o início da string 1
+# $a1: ponteiro para o início da string 2
+# $v0: 1 se forem iguais, 0 se não forem
+
+	# push to stack
+	subi $sp, $sp, 16
+	sw $a0, 0 ($sp)			# used as a pointer to string1
+	sw $a1, 4 ($sp)			# used as a pointer to string2
+	sw $t0, 8 ($sp)			# used to store a temp char from string1
+	sw $t1, 12($sp)			# used to store a temp char from string2
+
+	# get chars
+	str_compare_loop:
+	lbu $t0, 0($a0)						# read c1 from str1
+	lbu $t1, 0($a1)						# read c2 from str1
+	bne $t0, $t1, not_equal		# if c1 != c2, return false
+	beq $t0, $zero, are_equal	# if reached the end of both strings, return true
+	addi $a0, $a0, 1					# else, increase the pointers to both strings
+	addi $a1, $a1, 1					#	increase the pointers to both strings
+	j str_compare_loop				# and check next char
+
+	not_equal:
+	li $v0, 0
+	j sc_pop_ret
+	are_equal:
+	li $v0, 1
+
+	sc_pop_ret:
+	# pop from stack
+	lw $a0, 0 ($sp)			# used as a pointer to string1
+	lw $a1, 4 ($sp)			# used as a pointer to string2
+	lw $t0, 8 ($sp)			# used to store a temp char from string1
+	lw $t1, 12($sp)			# used to store a temp char from string2
+	addi $sp, $sp, 16
+
+	jr $ra
+
 # FUNCAO QUE LE UMA STRING, CHECA SE NELA TEM A DEClARACAO DE UMA LABEL, E RETORNA UMA STRING COM O NOME DA LABEL
 get_label_dec:
 # $a0: ponteiro para a string (linha)
