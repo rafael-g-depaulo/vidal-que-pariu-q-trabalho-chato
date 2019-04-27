@@ -1,4 +1,9 @@
 .data
+# USED TO TEST "str_compare"
+str1:									.asciiz "test1"
+str2:									.asciiz "test1"
+str3:									.asciiz "testt1"
+
 # USED BY "get_label_use"
 label_use_str:				.space 	40
 
@@ -41,7 +46,16 @@ lineend:							.asciiz "linha acabou."
 	# move $a0, $v0
 	# li $v0, 1
 	# syscall
-
+	
+	# str_compare test
+	la $a0, str1			# "test1"
+	la $a1, str2			# "test1"
+	jal str_compare		# should return true
+	
+	la $a0, str2			# "test1"
+	la $a1, str3			# "testt1"
+	jal str_compare		# should return false
+		
 	# end program
 	li $v0, 10
 	syscall
@@ -160,57 +174,53 @@ get_label_use:
 	li $t3, '0'
 	li $t4, '9'
 	slt $t2, $t1, $t3		# if char is less than '0'
-	bne $t2, $zero, not_numeric
+	bne $t2, $zero, glu_not_numeric
 	slt $t2, $t4, $t1		# if '9' is less than char
-	bne	$t2, $zero, not_numeric
+	bne	$t2, $zero, glu_not_numeric
 	j is_valid					# if got here, is a number (and therefore valid)
-	not_numeric:
+	glu_not_numeric:
 		# if A-Z	
 	li $t3, 'A'
 	li $t4, 'Z'
 	slt $t2, $t1, $t3		# if char is less than 'A'
-	bne $t2, $zero, not_upcase
+	bne $t2, $zero, glu_not_upcase
 	slt $t2, $t4, $t1		# if 'Z' is less than char
-	bne	$t2, $zero, not_upcase
+	bne	$t2, $zero, glu_not_upcase
 	j is_valid					# if got here, is a number (and therefore valid)
-	not_upcase:
+	glu_not_upcase:
 		# if a-z	
 	li $t3, 'a'
 	li $t4, 'z'
 	slt $t2, $t1, $t3		# if char is less than 'a'
-	bne $t2, $zero, not_downcase
+	bne $t2, $zero, glu_not_downcase
 	slt $t2, $t4, $t1		# if 'z' is less than char
-	bne	$t2, $zero, not_downcase
+	bne	$t2, $zero, glu_not_downcase
 	j is_valid					# if got here, is a number (and therefore valid)
-	not_downcase:
+	glu_not_downcase:
 
 	j isnt_valid			# if got here, isnt a valid char
 
 	# if is valid char
-	is_valid:
+	glu_is_valid:
 	sb $t1, 0($t0)		# write char to buffer
 	addi $t0, $t0, 1	# increase write buffer pointer
 	addi $a0, $a0, 1	# increase input string pointer
 	j glu_loop				# read next char
 
 	# else (is invalid char) finish label
-	isnt_valid:
+	glu_isnt_valid:
 	sb $zero, 0($t0)	# add '\0' at the end of buffer
 
 	# now look for which label it is in the list
 	find_label_loop:
-	jal string_compare
+	jal str_compare
 
 	# pop from stack & return
 
 	jr $ra
 
 # FUNCAO QUE COMPARA 2 STRINGS E CHECA SE SÃO IGUAIS
-#### UNTESTED ############
-#### UNTESTED ############
-#### UNTESTED ############
-#### UNTESTED ############
-str_compare:		# TODO: test this
+str_compare:
 # $a0: ponteiro para o início da string 1
 # $a1: ponteiro para o início da string 2
 # $v0: 1 se forem iguais, 0 se não forem
