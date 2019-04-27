@@ -1,7 +1,4 @@
 .data
-# USED TO TEST "get_imm"
-imm_test:							.asciiz "  ,    67,-234, \t\t\n  0x34FF5 -0xaBeD3"
-
 # USED BY "get_label_use"
 label_use_str:				.space 	40
 
@@ -45,23 +42,6 @@ lineend:							.asciiz "linha acabou."
 	# li $v0, 1
 	# syscall
 
-	# testing get_imm
-	la $a0, imm_test
-	jal get_imm
-	move $s0, $v0
-	move $a0, $v1
-
-	jal get_imm
-	move $s1, $v0
-	move $a0, $v1
-
-	jal get_imm
-	move $s2, $v0
-	move $a0, $v1
-	
-	jal get_imm
-	move $s3, $v0
-	
 	# end program
 	li $v0, 10
 	syscall
