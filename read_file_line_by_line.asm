@@ -1,10 +1,6 @@
 .data
 # USED BY "get_label_dec"
 label_dec_str:				.space 	40
-# USED IN "get_label_dec" tests
-linha_teste:					.asciiz "minha_label:   addi $t2, $t2, 9  " 
-linha_teste1:					.asciiz " li $t0, 2 \n\n    \tminha_label:   addi $t2, $t2, 9  " 
-linha_teste2:					.asciiz " li $t0, 2 \n\n    \tminha_label:   addi $t2, $t2, 9.. _kkk_label__%2: $sw $t0, 0($sp)  " 
 
 # USED BY "insert_label"
 label_list:						.word 	0	# ponteiro para o primeiro elemento da lista
@@ -42,13 +38,6 @@ lineend:							.asciiz "linha acabou."
 	# move $a0, $v0
 	# li $v0, 1
 	# syscall
-
-	# get label dec test
-	la $a0, linha_teste2
-	jal get_label_dec
-	# get next label in same line
-	move $a0, $v1
-	jal get_label_dec
 
 	# end program
 	li $v0, 10
