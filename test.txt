@@ -1,5 +1,11 @@
+ .data label0: .space 3
+label1: .word 2, 3, 4, 6
+
+      label3: .asciiz "aasdasdascasc"
+
+.text
+
 li $t0, 23340000019
-prox linha
 lw $t1, 0($t0)
 lw $t2, 4($t0)
 lw $t3, 8($t0)

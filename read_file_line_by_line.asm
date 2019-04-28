@@ -36,9 +36,14 @@ line:									.asciiz	"linha: "
 lineend:							.asciiz "linha acabou."
 
 .text
-	# # get filename
-	# jal get_file_name
+	# get filename
+	jal get_file_name
 	
+	# separate lines into .data & .text lists
+	move $a0, $v0	# file name
+	la $a1, insert_data_text	# function to separate lines
+	jal read_file_lines
+
 	# # print lines test
 	# move $a0, $v0
 	# la $a1, print_line
@@ -55,20 +60,20 @@ lineend:							.asciiz "linha acabou."
 	# li $v0, 1
 	# syscall
 
-	# insert data text test
-	la $a0, line1
-	li $a1, 0
-	jal insert_data_text
+	# # insert data text test
+	# la $a0, line1
+	# li $a1, 0
+	# jal insert_data_text
 
-	la $a0, line2
-	move $a1, $v0
-	jal insert_data_text
-	la $a0, line3
-	move $a1, $v0
-	jal insert_data_text
-	la $a0, line4
-	move $a1, $v0
-	jal insert_data_text
+	# la $a0, line2
+	# move $a1, $v0
+	# jal insert_data_text
+	# la $a0, line3
+	# move $a1, $v0
+	# jal insert_data_text
+	# la $a0, line4
+	# move $a1, $v0
+	# jal insert_data_text
 
 	# end program
 	li $v0, 10
@@ -785,7 +790,7 @@ insert_data_text:
 	# if got here, found a .data and $v0 was updater accordingly.
 	# insert rest of line in the apropriate list
 	# $a0 is already pointing to after .data/.text in line
-	move $a1, $v0	# load which line to insert it into
+	move $a1, $t5	# load which line to insert it into
 	jal insert_data_text	# call itself
 	# now pop and return
 
