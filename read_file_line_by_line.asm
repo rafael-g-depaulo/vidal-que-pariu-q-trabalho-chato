@@ -13,6 +13,15 @@ label_list_end:				.word 	0	# ponteiro para o último elemento da lista
 file_name_buffer:   	.space 	40
 enter_f_name_prompt: 	.asciiz "Entre o nome do arquivo a ser compilado: "
 
+# USED BY "insert_data_text"
+data_start:						.word		0			# ponteiro para o primeiro elemento da lista de linhas do .data
+data_end:							.word		0			# ponteiro para o ultimo elemento da lista de linhas do .data
+text_start:						.word		0			# ponteiro para o primeiro elemento da lista de linhas do .text
+text_end:							.word		0			# ponteiro para o ultimo elemento da lista de linhas do .text
+data_str:							.ascii "data"
+text_str:							.ascii "text"
+
+
 # USED BY "read_file_lines"
 file_buffer: 					.space 	20
 file_buffer_length: 	.word 	20
@@ -609,6 +618,164 @@ insert_label:
 	addi $sp, $sp, 32
 
 	jr $ra	#return
+
+# FUNCAO QUE DIVIDE AS LINHAS DE UM ARQUIVO ENTRE .data E .text
+insert_data_text:
+##### UNTESTED ###################
+##### UNTESTED ###################
+##### UNTESTED ###################
+##### UNTESTED ###################
+# $a0: ponteiro pra linha
+# $a1: 1 -> inserir em .data, 2 -> inserir em .text, 0 -> nao inserir em nenhum dos dois
+# $v0: 1 -> ja estava em ".data" e nao mudou, ou mudou para modo ".data"
+#			 2 -> ja estava em ".text" e nao mudou, ou mudou para modo ".text"
+#			 0 -> estava em 0, e nao achou ".data" ou ".text" na linha
+
+	# push to stack
+	subi $sp, $sp, 28
+	sw $ra,  0($sp)		# used for function calls
+	sw $a0,  4($sp)		# used for function calls
+	sw $a1,  8($sp)		# used for function calls
+	sw $t0, 12($sp)		# pointer to line string, pointer to start of list to be written to
+	sw $t1, 16($sp)   # aux char read from line, pointer to end of list to be written to
+	sw $t2, 20($sp)   # aux to construct .data/.text string for
+	sw $t3, 24($sp)   # aux to read char from string
+
+	# search through line to see if it's changing from .data/.text or vice-versa
+	# look for '.'
+	move $t0, $a0			# go to start of line
+	look_for_period_loop:
+	lbu $t1, 0($t0)					# get char
+	addi $t0, $t0, 1				# increase pointer
+	beq $t1, '\0', not_changing_modes
+	bne $t1, '.', look_for_period_loop
+
+	# check if ".data" or ".text"
+	# get 4 characters after '.' (looking for either .data or .text)
+	lbu $t2, 3($t0)					# load 4th char of line
+	move $t1, $t2						# add 4th char
+	sll $t1, $t1, 8					# shift to the side
+	lbu $t2, 2($t0)					# load 3rd char of line
+	or  $t1, $t1, $t2				# add 3rd char
+	sll $t1, $t1, 8					# shift to the side
+	lbu $t2, 1($t0)					# load 2nd char of line
+	or  $t1, $t1, $t2				# add 2nd char
+	sll $t1, $t1, 8					# shift to the side
+	lbu $t2, 0($t0)					# load 1st char of line
+	or  $t1, $t1, $t2				# add 1st char
+	# $t1 holds the 4 chars after '.' on the line string
+
+	# check if ".data"
+	lw $t2, data_str
+	bne $t1, $t2, idt_not_data
+	# got here -> is .data
+	addi $a0, $t0, 4		# set up line pointer to right after ".data"
+	li $v0, 1				 		# load $v0
+	j idt_call_itself_again
+	idt_not_data:
+
+	# check if ".text"
+	lw $t2, text_str
+	bne $t1, $t2, idt_not_changing_modes
+	# got here -> is .text
+	addi $a0, $t0, 4		# set up line pointer to right after ".text"
+	li $v0, 2				 		# load $v0
+	j idt_call_itself_again
+
+	idt_not_changing_modes:	# didn't find a ".data" or ".text"
+
+	# decide (based on $a1) which list to add element to
+	
+	# check if in .data
+	li $t0, 1
+	bne $a1, $t0, idt_insert_not_data
+	# if got here, insert into data
+	la $t0, data_start	# load start of list
+	la $t1, data_end		# load end of list
+	j idt_create_element
+	idt_insert_not_data:
+
+	# check if in .text
+	li $t0, 2
+	bne $a1, $t0, idt_insert_not_text
+	# if got here, insert into data
+	la $t0, data_start	# load start of list
+	la $t1, data_end		# load end of list
+	j idt_create_element
+	idt_insert_not_text:
+	# if got here, should just return.
+	# just go pop and return
+	j idt_pop_and_return
+	
+	# create list element
+	idt_create_element:
+
+	# get line length 9to alocate memory for it
+	idt_line_size:
+	li $t2, 0											# counter = 0
+	move $t0, $t1									# get copy of pointer
+	lbu $t3, 0($t0)								# getchar
+	addi $t2, $t2, 1							# counter++
+	bne $t3, $zero, idt_line_size	# while char != '\0'
+	# from here, $t2 has the size of the line string
+
+	# alocate memory for the new list element
+	addi $a0, $t2, 4	# 4 more bytes for the pointer to the next list element
+	li $v0, 9
+	syscall
+
+	# set .next to null
+	sw $zero, $v0
+
+	# if list.fist = null, set this as first
+	lw $t2, 0($t0)
+	bne $t2, $zero, idt_list_not_empty
+	sw $v0, 0($t0)
+	j ist_set_last_element
+
+	# if list.last != null, set list.last.next to this
+	idt_list_not_empty:
+	lw $t2, 0($t0)
+	sw $v0, 0($t2)
+	
+	# set list.last to this
+	ist_set_last_element:
+	sw $v0, 0($t1)
+
+	# copy string from $a0 into list element
+	# $v0: pointer to list element
+	# $a0: line pointer
+	# $t0: pointer to list element.line (the section where the string can be copied to)
+	# $t1: aux
+	addi $t0, $v0, 4		# get list element.line pointer
+	idt_copy_str_loop:
+	lbu $t1, 0($a0)			# get char
+	sb $t1, 0($t0)			# copy char to list element
+	addi $a0, $a0, 1		# increase line pointer
+	addi $t0, $t0, 1		# increase list element line pointer
+	bne $t1, $zero, idt_copy_str_loop	# while char != '\0'
+
+	j idt_pop_and_return
+	idt_call_itself_again:
+	# if got here, found a .data and $v0 was updater accordingly.
+	# insert rest of line in the apropriate list
+	# $a0 is already pointing to after .data/.text in line
+	move $a1, $v0	# load which line to insert it into
+	jal insert_data_text	# call itself
+	# now pop and return
+
+	idt_pop_and_return:
+	# pop from stack
+	lw $ra,  0($sp)		# used for function calls
+	lw $a0,  4($sp)		# used for function calls
+	lw $a1,  8($sp)		# used for function calls
+	lw $t0, 12($sp)		# pointer to line string, pointer to start of list to be written to
+	lw $t1, 16($sp)   # aux char read from line, pointer to end of list to be written to
+	lw $t2, 20($sp)   # aux to construct .data/.text string for
+	lw $t3, 24($sp)   # aux to read char from string
+	addi $sp, $sp, 28
+	
+	jr $ra # return
 
 # FUNCAO QUE LE UM ARQUIVO LINHA A LINHA E EXECUTA A FUNCAO DADA EM CADA LINHA
 read_file_lines:
