@@ -1,4 +1,17 @@
 .data
+# USED BY "insert_data_text"
+data_start:						.word		0			# ponteiro para o primeiro elemento da lista de linhas do .data
+data_end:							.word		0			# ponteiro para o ultimo elemento da lista de linhas do .data
+text_start:						.word		0			# ponteiro para o primeiro elemento da lista de linhas do .text
+text_end:							.word		0			# ponteiro para o ultimo elemento da lista de linhas do .text
+data_str:							.ascii 	"data"
+text_str:							.ascii 	"text"
+# USED TO TEST "insert_data_text"
+line1:								.asciiz ".data test1: .word 2, 2, 2, 2"
+line2:								.asciiz "test2: .word 2, 2, 2, 2"
+line3:								.asciiz ".text"
+line4:								.asciiz "  \t li $t2, 0x234"
+
 # USED BY "get_label_use"
 label_use_str:				.space 	40
 
@@ -12,15 +25,6 @@ label_list_end:				.word 	0	# ponteiro para o último elemento da lista
 # USED BY "get_file_name"
 file_name_buffer:   	.space 	40
 enter_f_name_prompt: 	.asciiz "Entre o nome do arquivo a ser compilado: "
-
-# USED BY "insert_data_text"
-data_start:						.word		0			# ponteiro para o primeiro elemento da lista de linhas do .data
-data_end:							.word		0			# ponteiro para o ultimo elemento da lista de linhas do .data
-text_start:						.word		0			# ponteiro para o primeiro elemento da lista de linhas do .text
-text_end:							.word		0			# ponteiro para o ultimo elemento da lista de linhas do .text
-data_str:							.ascii "data"
-text_str:							.ascii "text"
-
 
 # USED BY "read_file_lines"
 file_buffer: 					.space 	20
@@ -50,6 +54,21 @@ lineend:							.asciiz "linha acabou."
 	# move $a0, $v0
 	# li $v0, 1
 	# syscall
+
+	# insert data text test
+	la $a0, line1
+	li $a1, 0
+	jal insert_data_text
+
+	la $a0, line2
+	move $a1, $v0
+	jal insert_data_text
+	la $a0, line3
+	move $a1, $v0
+	jal insert_data_text
+	la $a0, line4
+	move $a1, $v0
+	jal insert_data_text
 
 	# end program
 	li $v0, 10
@@ -632,7 +651,7 @@ insert_data_text:
 #			 0 -> estava em 0, e nao achou ".data" ou ".text" na linha
 
 	# push to stack
-	subi $sp, $sp, 28
+	subi $sp, $sp, 36
 	sw $ra,  0($sp)		# used for function calls
 	sw $a0,  4($sp)		# used for function calls
 	sw $a1,  8($sp)		# used for function calls
@@ -640,15 +659,19 @@ insert_data_text:
 	sw $t1, 16($sp)   # aux char read from line, pointer to end of list to be written to
 	sw $t2, 20($sp)   # aux to construct .data/.text string for
 	sw $t3, 24($sp)   # aux to read char from string
-
+	sw $t4, 28($sp)		# used to store copy to $a0
+	sw $t5, 32($sp)		# used to store return value
+	
+	move $t5, $a1 		# initially set return to same as $a1
+	
 	# search through line to see if it's changing from .data/.text or vice-versa
 	# look for '.'
 	move $t0, $a0			# go to start of line
-	look_for_period_loop:
+	idt_look_for_period_loop:
 	lbu $t1, 0($t0)					# get char
 	addi $t0, $t0, 1				# increase pointer
-	beq $t1, '\0', not_changing_modes
-	bne $t1, '.', look_for_period_loop
+	beq $t1, '\0', idt_not_changing_modes
+	bne $t1, '.', idt_look_for_period_loop
 
 	# check if ".data" or ".text"
 	# get 4 characters after '.' (looking for either .data or .text)
@@ -670,7 +693,7 @@ insert_data_text:
 	bne $t1, $t2, idt_not_data
 	# got here -> is .data
 	addi $a0, $t0, 4		# set up line pointer to right after ".data"
-	li $v0, 1				 		# load $v0
+	li $t5, 1				 		# load $v0
 	j idt_call_itself_again
 	idt_not_data:
 
@@ -679,7 +702,7 @@ insert_data_text:
 	bne $t1, $t2, idt_not_changing_modes
 	# got here -> is .text
 	addi $a0, $t0, 4		# set up line pointer to right after ".text"
-	li $v0, 2				 		# load $v0
+	li $t5, 2				 		# load $v0
 	j idt_call_itself_again
 
 	idt_not_changing_modes:	# didn't find a ".data" or ".text"
@@ -699,8 +722,8 @@ insert_data_text:
 	li $t0, 2
 	bne $a1, $t0, idt_insert_not_text
 	# if got here, insert into data
-	la $t0, data_start	# load start of list
-	la $t1, data_end		# load end of list
+	la $t0, text_start	# load start of list
+	la $t1, text_end		# load end of list
 	j idt_create_element
 	idt_insert_not_text:
 	# if got here, should just return.
@@ -710,22 +733,24 @@ insert_data_text:
 	# create list element
 	idt_create_element:
 
-	# get line length 9to alocate memory for it
-	idt_line_size:
+	# get line length to alocate memory for it
+	move $t4, $a0									# save copy of line pointer
 	li $t2, 0											# counter = 0
-	move $t0, $t1									# get copy of pointer
-	lbu $t3, 0($t0)								# getchar
+	idt_line_size:
+	lbu $t3, 0($t4)								# getchar
 	addi $t2, $t2, 1							# counter++
+	addi $t4, $t4, 1							# pointer++
 	bne $t3, $zero, idt_line_size	# while char != '\0'
 	# from here, $t2 has the size of the line string
 
 	# alocate memory for the new list element
+	move $t3, $a0 		# save $a0
 	addi $a0, $t2, 4	# 4 more bytes for the pointer to the next list element
 	li $v0, 9
 	syscall
-
+	move $a0, $t3 		# reload $a0
 	# set .next to null
-	sw $zero, $v0
+	sw $zero, 0($v0)
 
 	# if list.fist = null, set this as first
 	lw $t2, 0($t0)
@@ -735,7 +760,7 @@ insert_data_text:
 
 	# if list.last != null, set list.last.next to this
 	idt_list_not_empty:
-	lw $t2, 0($t0)
+	lw $t2, 0($t1)
 	sw $v0, 0($t2)
 	
 	# set list.last to this
@@ -765,6 +790,8 @@ insert_data_text:
 	# now pop and return
 
 	idt_pop_and_return:
+	move $v0, $t5			# set return value
+	
 	# pop from stack
 	lw $ra,  0($sp)		# used for function calls
 	lw $a0,  4($sp)		# used for function calls
@@ -773,7 +800,9 @@ insert_data_text:
 	lw $t1, 16($sp)   # aux char read from line, pointer to end of list to be written to
 	lw $t2, 20($sp)   # aux to construct .data/.text string for
 	lw $t3, 24($sp)   # aux to read char from string
-	addi $sp, $sp, 28
+	lw $t4, 28($sp)		# used to store copy to $a0
+	lw $t5, 32($sp)		# used to store return value
+	addi $sp, $sp, 36
 	
 	jr $ra # return
 
