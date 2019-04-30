@@ -645,10 +645,6 @@ insert_label:
 
 # FUNCAO QUE DIVIDE AS LINHAS DE UM ARQUIVO ENTRE .data E .text
 insert_data_text:
-##### UNTESTED ###################
-##### UNTESTED ###################
-##### UNTESTED ###################
-##### UNTESTED ###################
 # $a0: ponteiro pra linha
 # $a1: 1 -> inserir em .data, 2 -> inserir em .text, 0 -> nao inserir em nenhum dos dois
 # $v0: 1 -> ja estava em ".data" e nao mudou, ou mudou para modo ".data"
