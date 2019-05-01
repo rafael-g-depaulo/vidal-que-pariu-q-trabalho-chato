@@ -1,7 +1,7 @@
- .data label0: .space 3
-label1: .word 2, 3, 4, 6
-
-      label3: .asciiz "aasdasdascasc"
+   .data
+   label1:   .word -34    , 0xFFF
+    .word 123, -8
+_my_label_label3: .word 0x54
 
 .text
 

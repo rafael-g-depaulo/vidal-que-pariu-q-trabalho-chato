@@ -43,18 +43,22 @@ line:									.asciiz	"linha: "
 lineend:							.asciiz "linha acabou."
 
 .text
-	# # get filename
-	# jal get_file_name
+	# get filename
+	jal get_file_name
 	
-	# # separate lines into .data & .text lists
-	# move $a0, $v0	# file name
-	# la $a1, insert_data_text	# function to separate lines
-	# jal read_file_lines
-
-	la $a0, data_test
-	jal transcribe_data
-	la $a0, data_test2
-	jal transcribe_data
+	# separate lines into .data & .text lists
+	move $a0, $v0	# file name
+	la $a1, insert_data_text	# function to separate lines
+	jal read_file_lines
+	
+	# parse data test
+	jal parse_data
+	
+	# # transcribe data test
+	# la $a0, data_test
+	# jal transcribe_data
+	# la $a0, data_test2
+	# jal transcribe_data
 
 	# # print lines test
 	# move $a0, $v0
@@ -166,6 +170,35 @@ print_line:
 	addi $sp, $sp, 12
 	
 	jr $ra # return
+
+# FUNCAO QUE PERCORRE A LISTA DE LINHAS DO .data, E CHAMA "transcribe_data" EM TODAS ELAS
+parse_data:
+# NO ARGUMENTS
+# NO RETURN
+
+	# push to stack
+	subi $sp, $sp, 12
+	sw $a0,  0($sp)	# function calls
+	sw $t0,  4($sp)	# pointer to list element
+	sw $ra,  8($sp)	# function calls
+
+	lw $t0, data_start			# load first element (list.first)
+	pd_loop:
+	beq $t0, $zero, pd_end	# if element == null, end
+	addi $a0, $t0, 4				# load element.line (string of the .data line)
+	jal transcribe_data			# transcribe the line's data
+	lw $t0, 0($t0)					# set element.next as next element
+	j pd_loop
+
+	pd_end:	# finished with .data lines
+
+	# pop
+	lw $a0,  0($sp)	# function calls
+	lw $t0,  4($sp)	# pointer to list element
+	lw $ra,  8($sp)	# function calls
+	subi $sp, $sp, 12
+	
+	jr $ra	# return
 
 # FUNCAO QUE PERCORRE UMA LINHA INTEIRA DO .data, CONTA DADOS A SEREM INICIALIZADOS NA MEMÓRIA, E DECLARA E INICIALIZA LABELS DO .data
 transcribe_data:
