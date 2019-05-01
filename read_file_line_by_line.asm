@@ -2,6 +2,8 @@
 # USED BY "transcribe_data"
 dot_data:							.space 	80		# array que vai guardar o .data do programa sendo compilado
 dot_data_used:				.word 	0			# quantidada de bytes ja escritos no dot_data
+# USED TO TEST "transcribe_data"
+data_test:						.asciiz	"     .word    asdrr: 6,0,15 \n\n LABEL_TEST: .word 35 "
 
 # USED BY "insert_data_text"
 data_start:						.word		0			# ponteiro para o primeiro elemento da lista de linhas do .data
@@ -40,13 +42,16 @@ line:									.asciiz	"linha: "
 lineend:							.asciiz "linha acabou."
 
 .text
-	# get filename
-	jal get_file_name
+	# # get filename
+	# jal get_file_name
 	
-	# separate lines into .data & .text lists
-	move $a0, $v0	# file name
-	la $a1, insert_data_text	# function to separate lines
-	jal read_file_lines
+	# # separate lines into .data & .text lists
+	# move $a0, $v0	# file name
+	# la $a1, insert_data_text	# function to separate lines
+	# jal read_file_lines
+
+	la $a0, data_test
+	jal transcribe_data
 
 	# # print lines test
 	# move $a0, $v0
@@ -166,7 +171,6 @@ print_line:
 ##### UNTESTED #################
 transcribe_data:
 # $a0: ponteiro para string (linha)
-# $a1: counter de quantas words ja existem no .data
 # $v0: quantidade de words achadas
 	
 	# push to stack
@@ -184,7 +188,7 @@ transcribe_data:
 
 	# load $s0, $s10 and $s2
 	lw $s1, dot_data_used				# number of bytes already occupied
-	lw $s0, dot_data						# pointer to start of .data
+	la $s0, dot_data						# pointer to start of .data
 	add $s0, $s0, $s1						# pointer to next available spot in .data
 	lui $s2, 0x1001							# load start of .data
 	add $s2, $s2, $s1						# add ammount of bytes already occupied
@@ -194,6 +198,7 @@ transcribe_data:
 	lbu $t0, 0($a0) 					# get char
 	addi $a0, $a0, 1					# increase pointer
 	beq $t0, ' ', td_getchar	# while char == ' '
+	beq $t0, ',', td_getchar	# while char == ','
 	beq $t0, '\t', td_getchar	# while char == '\t'
 	beq $t0, '\n', td_getchar	# while char == '\n'
 	beq $t0, $zero, td_found_end_of_line
