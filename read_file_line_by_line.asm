@@ -1,4 +1,8 @@
 .data
+# USED BY "transcribe_data"
+dot_data:							.space 	80		# array que vai guardar o .data do programa sendo compilado
+dot_data_used:				.word 	0			# quantidada de bytes ja escritos no dot_data
+
 # USED BY "insert_data_text"
 data_start:						.word		0			# ponteiro para o primeiro elemento da lista de linhas do .data
 data_end:							.word		0			# ponteiro para o ultimo elemento da lista de linhas do .data
@@ -154,6 +158,107 @@ print_line:
 	addi $sp, $sp, 12
 	
 	jr $ra # return
+
+# FUNCAO QUE PERCORRE UMA LINHA INTEIRA DO .data, CONTA DADOS A SEREM INICIALIZADOS NA MEMÓRIA, E DECLARA E INICIALIZA LABELS DO .data
+##### UNTESTED #################
+##### UNTESTED #################
+##### UNTESTED #################
+##### UNTESTED #################
+transcribe_data:
+# $a0: ponteiro para string (linha)
+# $a1: counter de quantas words ja existem no .data
+# $v0: quantidade de words achadas
+	
+	# push to stack
+	subi $sp, $sp, 40
+	sw $a0,  0($sp) # $a0: used to traverse line, function calls
+	sw $a1,  4($sp)	# $a1: function calls
+	sw $t0,  8($sp)	# $t0: aux to hold char, pointer to string of name of label found
+	sw $t1, 12($sp)	# $t1: flag for comparison
+	sw $t2, 16($sp)	# $t2: holds char used for comparison
+	sw $t3, 20($sp)	# $t3: holds char used for comparison
+	sw $s0, 24($sp)	# $s0: hols pointer to next free spot in .data array
+	sw $s1, 28($sp)	# $s1: holds number of words written in .data array already
+	sw $s2, 32($sp)	# $s2: holds address of next word in the compiled document
+	sw $ra, 36($sp)	# $ra: function calls
+
+	# load $s0, $s10 and $s2
+	lw $s1, dot_data_used				# number of bytes already occupied
+	lw $s0, dot_data						# pointer to start of .data
+	addi $s0, $s0, $s1					# pointer to next available spot in .data
+	lui $s2, 0x10010000					# load start of .data
+	add $s2, $s2, $s1						# add ammount of bytes already occupied
+
+	# percorrer a string ate achar nao-whitespace (se achar '\0' para)
+	td_getchar:
+	lbu $t0, 0($a0) 					# get char
+	addi $a0, $a0, 1					# increase pointer
+	beq $t0, ' ', td_getchar	# while char == ' '
+	beq $t0, '\t', td_getchar	# while char == '\t'
+	beq $t0, '\n', td_getchar	# while char == '\n'
+	beq $t0, $zero, td_found_end_of_line
+
+	# now $t0 has a char thats not a whitespace
+
+	# se '.', eh .word
+	bne $t0, '.', td_not_dot
+	addi $a0, $a0, 4	# point to after ".word"
+	j td_getchar			# get next char
+	td_not_dot:
+
+	# checa se e numero ('0'-'9')
+	li $t2, '0'
+	li $t3, '9'
+	slt $t1, $t0, $t2		# if digit is less than '0'
+	bne $t1, $zero, td_not_num
+	slt $t1, $t3, $t0		# if '9' is less than digit
+	bne	$t1, $zero, td_not_num
+
+	# se for, insira o numero na array do dot_data e aumente o size
+	subi $a0, $a0, 1	# point $a0 to first digit of nuber to be read
+	jal get_imm
+	move $a0, $v1			# get pointer to char right after number read
+	sw $v0, 0($s0)		# write word to memory
+	addi $s0, $s0, 4	# increase .data pointer
+	addi $s1, $s1, 4	# increase counter of how many bytes have been read
+	addi $s2, $s2, 4	# increase pointer for .data of file being read
+
+	j td_getchar			# get next char
+	td_not_num:
+	# if got here, it's a label declaration
+
+	# get label string
+	subi $a0, $a0, 1	# point $a0 to first char of label string
+	jal get_label_dec	# get label
+	move $t0, $v1			# save line pointer of char after label dec
+
+	# insert new label
+	move $a0, $s2					# load label address
+	la $a1, label_dec_str	# load label string (got from calling get_label_dec)
+	jal insert_label			# add new label
+
+	move $a0, $t0			# load pointer of right after label dec
+	j td_getchar			# get next char
+
+	# found end of line (return)
+	td_found_end_of_line:
+	# save in memory how many words have been written in .data
+	sw $s1, dot_data_used
+
+	# pop
+	lw $a0,  0($sp) # $a0: used to traverse line, function calls
+	lw $a1,  4($sp)	# $a1: function calls
+	lw $t0,  8($sp)	# $t0: aux to hold char, pointer to string of name of label found
+	lw $t1, 12($sp)	# $t1: flag for comparison
+	lw $t2, 16($sp)	# $t2: holds char used for comparison
+	lw $t3, 20($sp)	# $t3: holds char used for comparison
+	lw $s0, 24($sp)	# $s0: hols pointer to next free spot in .data array
+	lw $s1, 28($sp)	# $s1: holds number of words written in .data array already
+	lw $s2, 32($sp)	# $s2: holds address of next word in the compiled document
+	lw $ra, 36($sp)	# $ra: function calls
+	addi $sp, $sp, 40
+
+	jr $ra	# return
 
 # FUNCAO QUE LE UMA STRING, CHECA SE NELA TEM UM IMEDIATO SENDO USADO, E RETORNA O VALOR DA LABEL,
 #   E UM PONTEIRO PARA LOGO APÓS O USO DELE
@@ -872,7 +977,7 @@ not_EOF:
 move_char_buffer2line:
 	lbu $t2, 0($t0)								# get cuttent byte
 	beq $t2, $t3, line_done				# if found '\n', end line and proccess it
-	
+
 	# if not '\n', write to line buffer
 	sb $t2, 0($s1)									# write to current char in line
 	addi $s1, $s1, 1								# increase line buffer pointer ($s1)
