@@ -185,8 +185,8 @@ transcribe_data:
 	# load $s0, $s10 and $s2
 	lw $s1, dot_data_used				# number of bytes already occupied
 	lw $s0, dot_data						# pointer to start of .data
-	addi $s0, $s0, $s1					# pointer to next available spot in .data
-	lui $s2, 0x10010000					# load start of .data
+	add $s0, $s0, $s1						# pointer to next available spot in .data
+	lui $s2, 0x1001							# load start of .data
 	add $s2, $s2, $s1						# add ammount of bytes already occupied
 
 	# percorrer a string ate achar nao-whitespace (se achar '\0' para)
