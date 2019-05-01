@@ -4,6 +4,7 @@ dot_data:							.space 	80		# array que vai guardar o .data do programa sendo co
 dot_data_used:				.word 	0			# quantidada de bytes ja escritos no dot_data
 # USED TO TEST "transcribe_data"
 data_test:						.asciiz	"     .word    asdrr: 6,0,15 \n\n LABEL_TEST: .word 35 "
+data_test2:						.asciiz	"label2: -15   ,   \n\n-0x734F, -0225 \n\n _LABEL_TEST45: .word 35 "
 
 # USED BY "insert_data_text"
 data_start:						.word		0			# ponteiro para o primeiro elemento da lista de linhas do .data
@@ -51,6 +52,8 @@ lineend:							.asciiz "linha acabou."
 	# jal read_file_lines
 
 	la $a0, data_test
+	jal transcribe_data
+	la $a0, data_test2
 	jal transcribe_data
 
 	# # print lines test
@@ -165,26 +168,23 @@ print_line:
 	jr $ra # return
 
 # FUNCAO QUE PERCORRE UMA LINHA INTEIRA DO .data, CONTA DADOS A SEREM INICIALIZADOS NA MEMÓRIA, E DECLARA E INICIALIZA LABELS DO .data
-##### UNTESTED #################
-##### UNTESTED #################
-##### UNTESTED #################
-##### UNTESTED #################
 transcribe_data:
 # $a0: ponteiro para string (linha)
-# $v0: quantidade de words achadas
 	
 	# push to stack
-	subi $sp, $sp, 40
-	sw $a0,  0($sp) # $a0: used to traverse line, function calls
-	sw $a1,  4($sp)	# $a1: function calls
-	sw $t0,  8($sp)	# $t0: aux to hold char, pointer to string of name of label found
-	sw $t1, 12($sp)	# $t1: flag for comparison
-	sw $t2, 16($sp)	# $t2: holds char used for comparison
-	sw $t3, 20($sp)	# $t3: holds char used for comparison
-	sw $s0, 24($sp)	# $s0: hols pointer to next free spot in .data array
-	sw $s1, 28($sp)	# $s1: holds number of words written in .data array already
-	sw $s2, 32($sp)	# $s2: holds address of next word in the compiled document
-	sw $ra, 36($sp)	# $ra: function calls
+	subi $sp, $sp, 48
+	sw $v0,  0($sp)	# $v1: function calls
+	sw $v1,  4($sp)	# $v1: function calls
+	sw $a0,  8($sp) # $a0: used to traverse line, function calls
+	sw $a1, 12($sp)	# $a1: function calls
+	sw $t0, 16($sp)	# $t0: aux to hold char, pointer to string of name of label found
+	sw $t1, 20($sp)	# $t1: flag for comparison
+	sw $t2, 24($sp)	# $t2: holds char used for comparison
+	sw $t3, 28($sp)	# $t3: holds char used for comparison
+	sw $s0, 32($sp)	# $s0: hols pointer to next free spot in .data array
+	sw $s1, 36($sp)	# $s1: holds number of words written in .data array already
+	sw $s2, 40($sp)	# $s2: holds address of next word in the compiled document
+	sw $ra, 44($sp)	# $ra: function calls
 
 	# load $s0, $s10 and $s2
 	lw $s1, dot_data_used				# number of bytes already occupied
@@ -211,24 +211,35 @@ transcribe_data:
 	j td_getchar			# get next char
 	td_not_dot:
 
-	# checa se e numero ('0'-'9')
+	# checa se e numero ('0'-'9') (ou '-')
+	beq $t0, '-', td_num_neg
 	li $t2, '0'
 	li $t3, '9'
 	slt $t1, $t0, $t2		# if digit is less than '0'
 	bne $t1, $zero, td_not_num
 	slt $t1, $t3, $t0		# if '9' is less than digit
 	bne	$t1, $zero, td_not_num
+	j td_call_get_imm
+	
+	# if got here, is a negative number
+	td_num_neg:
+	addi $a0, $a0, 1	# increase pointer because of '-' read. (it'll point to after first digit, but it'll be fixe in td_call_get_imm')
 
-	# se for, insira o numero na array do dot_data e aumente o size
+	# insira o numero na array do dot_data e aumente o size
+	td_call_get_imm:
 	subi $a0, $a0, 1	# point $a0 to first digit of nuber to be read
+	lbu $t0, -1($a0)	# check if previous char is a '-'
 	jal get_imm
+	bne $t0, '-', td_not_neg
+	sub $v0, $zero, $v0	# if negative number, subtract number read
+	td_not_neg:
 	move $a0, $v1			# get pointer to char right after number read
 	sw $v0, 0($s0)		# write word to memory
 	addi $s0, $s0, 4	# increase .data pointer
 	addi $s1, $s1, 4	# increase counter of how many bytes have been read
 	addi $s2, $s2, 4	# increase pointer for .data of file being read
-
 	j td_getchar			# get next char
+
 	td_not_num:
 	# if got here, it's a label declaration
 
@@ -251,17 +262,19 @@ transcribe_data:
 	sw $s1, dot_data_used
 
 	# pop
-	lw $a0,  0($sp) # $a0: used to traverse line, function calls
-	lw $a1,  4($sp)	# $a1: function calls
-	lw $t0,  8($sp)	# $t0: aux to hold char, pointer to string of name of label found
-	lw $t1, 12($sp)	# $t1: flag for comparison
-	lw $t2, 16($sp)	# $t2: holds char used for comparison
-	lw $t3, 20($sp)	# $t3: holds char used for comparison
-	lw $s0, 24($sp)	# $s0: hols pointer to next free spot in .data array
-	lw $s1, 28($sp)	# $s1: holds number of words written in .data array already
-	lw $s2, 32($sp)	# $s2: holds address of next word in the compiled document
-	lw $ra, 36($sp)	# $ra: function calls
-	addi $sp, $sp, 40
+	lw $v0,  0($sp)	# $v1: function calls
+	lw $v1,  4($sp)	# $v1: function calls
+	lw $a0,  8($sp) # $a0: used to traverse line, function calls
+	lw $a1, 12($sp)	# $a1: function calls
+	lw $t0, 16($sp)	# $t0: aux to hold char, pointer to string of name of label found
+	lw $t1, 20($sp)	# $t1: flag for comparison
+	lw $t2, 24($sp)	# $t2: holds char used for comparison
+	lw $t3, 28($sp)	# $t3: holds char used for comparison
+	lw $s0, 32($sp)	# $s0: hols pointer to next free spot in .data array
+	lw $s1, 36($sp)	# $s1: holds number of words written in .data array already
+	lw $s2, 40($sp)	# $s2: holds address of next word in the compiled document
+	lw $ra, 44($sp)	# $ra: function calls
+	addi $sp, $sp, 48
 
 	jr $ra	# return
 
