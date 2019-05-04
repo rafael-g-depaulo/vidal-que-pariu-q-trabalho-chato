@@ -1,6 +1,6 @@
 .data
 # USED BY "get_instruction"
-int_found				.word	0, 0
+int_found:						.word		0, 0
 # USED BY "transcribe_data"
 dot_data:							.space 	80		# array que vai guardar o .data do programa sendo compilado
 dot_data_used:				.word 	0			# quantidada de bytes ja escritos no dot_data
@@ -55,6 +55,14 @@ lineend:							.asciiz "linha acabou."
 	
 	# parse data test
 	jal parse_data
+	
+	lw $a0, text_start
+	lw $a1, text_end
+
+	addi $a0, $a0, 4		# get first line
+	jal get_instruction	# get instruction from line
+
+	lw $t0, int_found		# load instruction found
 	
 	# # transcribe data test
 	# la $a0, data_test
@@ -1754,7 +1762,7 @@ get_reg:
 	sw $t2, 8($sp)				#
 	sw $t3, 12($sp)				####
 
-	addi $t0, $a0, $zero	# coloca em t0 o argumento de a0
+	add $t0, $a0, $zero		# coloca em t0 o argumento de a0
 	addi $t2, $zero, '$'	# $t2 = '$', para comparar e checar se encontrou um reg
 	
 	GRloop:
