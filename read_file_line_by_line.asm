@@ -1,4 +1,6 @@
 .data
+# USED BY "get_instruction"
+int_found				.word	0, 0
 # USED BY "transcribe_data"
 dot_data:							.space 	80		# array que vai guardar o .data do programa sendo compilado
 dot_data_used:				.word 	0			# quantidada de bytes ja escritos no dot_data
@@ -1099,36 +1101,672 @@ line_done:
 
 # END OF FUNCTION
 
+# FUNCAO PRA IDENTIFICAR QUAL A INSTRUCAO DA LINHA
+#####
+# a0: endereço pra algum lugar na linha antes do mnemonico
+# v0: 
+# v1: ponteiro para proximo char depois da instrucao
+#
+
+get_instruction:
+
+    addi $sp, $sp, -16  ###
+    sw $t0, 0($sp)      # 
+    sw $t1, 4($sp)      # prepara stack
+    sw $t2, 8($sp)      # 
+    sw $t3, 12($sp)     ###
+
+
+    add $t0, $a0, $zero # prepara reg para ser usado em vez do a0
+
+    GIloop:
+        lbu $t1, 0($t0)         # poe em t1 o caractere atual da linha
+        addi $t0, $t0, 1        # marca o proximo caractere a ser pego
+        bne $t1, ' ', GIfound   # ao achar algo que nao seja ' ', considera que achou uma instr e tenta descobrir qual
+        j GIloop                # se for igual a ' ', continua procurando
+
+    # a partir daqui o valor em t2 nao sera mais importante, ele sera reatribuido
+    # t1 = primeiro char do mnemonico, t0 = aponta pro proximo char
+    GIfound:
+
+    lbu $t2, 0($t0)     # t2 = segundo char do mne
+    addi $t0, $t0, 1
+    beq $t1, 'j', GIfamJ
+    beq $t1, 'a', GIfamA
+    beq $t1, 'l', GIfamL
+    beq $t1, 's', GIfamS
+    beq $t1, 'b', GIfamB
+    beq $t1, 'm', GIfamM
+    beq $t1, 'o', GIfamO
+    beq $t1, 'x', GIfamX
+
+    beq $t1, 'n', GIisNor
+    beq $t1, 'd', GIisDiv
+    beq $t1, 'c', GIisClo
+
+    j not_inst          # se nao passou em nenhum caso, nao e inst
+
+    GIfamJ:
+        beq $t2, ' ', GIisJump      # se o char apos o 'j' for espaco branco, e um jump incondicional
+        beq $t2, 'a', GIisJal       # se for 'a', e um jal
+        beq $t2, 'r', GIisJr        # se for 'r', e um jr
+        j not_inst          # se nao passou em nenhum caso, nao e inst
+        GIisJump:
+            add $t1, $zero, $zero       # carregar no t1 o hexa do jump, primeiramente carregando o opcode  
+            
+            add $a0, $t0, $zero
+            jal get_label_use
+            or $t1, $t1, $v0
+            li $v0, 1
+            j end_get_instruction
+        GIisJal:
+            li $t1, 0x0c000000     # t1 = opcode de jal + 'lixo', zeros
+            
+            add $a0, $t0, $zero
+            jal get_label_use
+            or $t1, $t1, $v0
+            li $v0, 1
+            j end_get_instruction
+        GIisJr:
+            li $t1 0x00000008
+            
+            add $a0, $t0, $zero # prepara o a0 pra funct
+            jal get_reg           # chamo get_reg pra pegar o primeiro reg
+            sll $v0, $v0, 21    # ponho o primeiro reg (rs) no campo dele
+            or $t1, $t1, $v0    # junto com o op code ja em t1
+            li $v0, 1
+            j end_get_instruction
+
+    GIfamA:
+        beq $t2, 'd', GIcaseAdd
+        beq $t2, 'n', GIcaseAnd
+        j not_inst          # se nao passou em nenhum caso, nao e inst
+        GIcaseAdd:
+            addi $t0, $t0, 1
+            lbu $t3, 0($t0)
+            beq $t3, ' ', GIisAdd
+            beq $t3, 'i', GIisAddi
+            beq $t3, 'u', GIisAddu
+            j not_inst          # se nao passou em nenhum caso, nao e inst
+            GIisAdd:
+                li $t1, 0x00000020
+
+                add $a0, $t0, $zero # prepara o a0 pra funct
+                jal get_reg           # chamo get_reg pra pegar o primeiro reg
+                sll $v0, $v0, 11    # ponho o primeiro reg (rd) no campo dele
+                or $t1, $t1, $v0    # junto com o op code ja em t1
+                add $a0, $v1, $zero # pra procurar o proximo reg, passo como argumento o endereco depois do primeiro reg
+                jal get_reg
+                sll $v0, $v0, 21    # por o rs no campo dele
+                or $t1, $t1, $v0    # junto no t1
+                add $a0, $v1, $zero 
+                jal get_reg
+                sll $v0, $v0, 16    # por o rt no campo 
+                or $t1, $t1, $v0
+                li $v0, 1
+                j end_get_instruction
+            GIisAddi:
+                li $t1, 0x20000000
+                
+                add $a0, $t0, $zero # prepara o a0 pra funct
+                jal get_reg           # chamo get_reg pra pegar o primeiro reg
+                sll $v0, $v0, 16    # ponho o primeiro reg (rt) no campo dele
+                or $t1, $t1, $v0    # junto com o op code ja em t1
+                add $a0, $v1, $zero # pra procurar o proximo reg, passo como argumento o endereco depois do primeiro reg
+                jal get_reg
+                sll $v0, $v0, 21    # por o rs no campo dele
+                or $t1, $t1, $v0    # junto no t1
+                add $a0, $v1, $zero
+                jal get_imm           # pegar o immediate
+                sll $v0, $v0, 16    # apaga (por seguranca) o upper immediate 
+                srl $v0, $v0, 16    # retorna o lower immediate pra posicao correta
+                or $t1, $t1, $v0    # colocar o immediate no campo dele
+                li $v0, 1
+                j end_get_instruction
+            GIisAddu:
+                li $t1, 0x00000021
+
+                add $a0, $t0, $zero # prepara o a0 pra funct
+                jal get_reg           # chamo get_reg pra pegar o primeiro reg
+                sll $v0, $v0, 11    # ponho o primeiro reg (rd) no campo dele
+                or $t1, $t1, $v0    # junto com o op code ja em t1
+                add $a0, $v1, $zero # pra procurar o proximo reg, passo como argumento o endereco depois do primeiro reg
+                jal get_reg
+                sll $v0, $v0, 21    # por o rs no campo dele
+                or $t1, $t1, $v0    # junto no t1
+                add $a0, $v1, $zero 
+                jal get_reg
+                sll $v0, $v0, 16    # por o rt no campo 
+                or $t1, $t1, $v0
+                li $v0, 1
+                j end_get_instruction
+
+        GIcaseAnd:
+            addi $t0, $t0, 1
+            lbu $t3, 0($t0)
+            beq $t3, ' ', GIisAnd
+            beq $t3, 'i', GIisAndi
+            j not_inst          # se nao passou em nenhum caso, nao e inst
+            GIisAnd:
+                li $t1, 0x00000024
+
+                add $a0, $t0, $zero # prepara o a0 pra funct
+                jal get_reg           # chamo get_reg pra pegar o primeiro reg
+                sll $v0, $v0, 11    # ponho o primeiro reg (rd) no campo dele
+                or $t1, $t1, $v0    # junto com o op code ja em t1
+                add $a0, $v1, $zero # pra procurar o proximo reg, passo como argumento o endereco depois do primeiro reg
+                jal get_reg
+                sll $v0, $v0, 21    # por o rs no campo dele
+                or $t1, $t1, $v0    # junto no t1
+                add $a0, $v1, $zero 
+                jal get_reg
+                sll $v0, $v0, 16    # por o rt no campo 
+                or $t1, $t1, $v0
+                li $v0, 1
+                j end_get_instruction
+            GIisAndi:      
+                li $t1, 0x30000000
+                
+                add $a0, $t0, $zero # prepara o a0 pra funct
+                jal get_reg           # chamo get_reg pra pegar o primeiro reg
+                sll $v0, $v0, 16    # ponho o primeiro reg (rt) no campo dele
+                or $t1, $t1, $v0    # junto com o op code ja em t1
+                add $a0, $v1, $zero # pra procurar o proximo reg, passo como argumento o endereco depois do primeiro reg
+                jal get_reg
+                sll $v0, $v0, 21    # por o rs no campo dele
+                or $t1, $t1, $v0    # junto no t1
+                add $a0, $v1, $zero
+                jal get_imm           # pegar o immediate
+                sll $v0, $v0, 16    # apaga (por seguranca) o upper immediate 
+                srl $v0, $v0, 16    # retorna o lower immediate pra posicao correta
+                or $t1, $t1, $v0    # colocar o immediate no campo dele
+                li $v0, 1
+                j end_get_instruction
+
+    GIfamL:
+        beq $t2, 'i', GIisLi
+        beq $t2, 'u', GIisLui
+        beq $t2, 'w', GIisLw
+        j not_inst          # se nao passou em nenhum caso, nao e inst
+        GIisLi:
+            #PSEUDO COMPLETA
+            li $t1, 0x3c000000      # um li = lui -> ori, primeiro montando o lui
+            ori $t1, $t1, 0x00010000    # colocando no t1 o reg at, no campo rt, usado em pseudo instrucoes
+
+            add $a0, $t0, $zero         # prepara o endereco p pedir a funct
+            jal get_reg                   # pegando o primeiro reg
+            sll $t3, $v0, 16            # colocando o valor do reg rt no campo certo, e preserva o reg
+            or $t1, $t1, $t3            # poe o reg no t1 montando o hexa
+            add $t3, $v0, $zero         # preserva o valor do reg p ser usado depois
+            add $a0, $v1, $zero         # preparando o endereco pra prox funct
+            jal get_imm                   # pegando o imm
+            srl $t4, $v0, 16            # pegando somente a parte do upper immediate, e preservando o valor do reg
+            or $t1, $t1, $t4            # por o imm na montagem do hexa
+            add $t4, $v0, $zero         # t4 = immediate, preservando o valor
+
+            # foi montado a primeira parte, o lui. t3 = o reg do li, t4 = o imm do li
+            # agora montar o ori em t2
+
+            li $t2, 0x34000000          # opcode do ori
+            ori $t2, $t2, 0x00200000    # colocando o at no hexa do ori, no campo rs
+
+            sll $t3, $t3, 16            # o reg gravado em t3 e shiftado pra posicao do campo rt
+            or $t2, $t2, $t3            # juntando no hexa do ori
+            sll $t4, $t4, 16            # shift para zerar o upper immediate
+            srl $t4, $t4, 16            # shift para colocar o lower immediate de volta no lugar, pronto pro or
+            or $t2, $t2, $t4            # poe o lower immediate no campo certo
+
+            li $v0, 2
+            j end_get_instruction
+
+        GIisLui:
+            li $t1, 0x3c000000
+            
+            add $a0, $t0, $zero # prepara o a0 pra funct
+            jal get_reg           # chamo get_reg pra pegar o primeiro reg
+            sll $v0, $v0, 16    # ponho o primeiro reg (rt) no campo dele
+            or $t1, $t1, $v0    # junto com o op code ja em t1
+            add $a0, $v1, $zero # pra procurar o proximo reg, passo como argumento o endereco depois do primeiro reg
+            jal get_imm           # pegar o immediate
+            sll $v0, $v0, 16    # apaga (por seguranca) o upper immediate 
+            srl $v0, $v0, 16    # retorna o lower immediate pra posicao correta
+            or $t1, $t1, $v0    # colocar o immediate no campo dele
+            li $v0, 1
+            j end_get_instruction
+        GIisLw:
+            li $t1, 0x8c000000
+            
+            add $a0, $t0, $zero
+            jal get_reg
+            sll $v0, $v0, 16
+            or $t1, $t1, $v0        # pegando o rt, colocando na posicao certa e juntando ao t1
+            add $a0, $v1, $zero
+            jal get_imm
+            sll $v0, $v0, 16    # apaga (por seguranca) o upper immediate 
+            srl $v0, $v0, 16    # retorna o lower immediate pra posicao correta
+            or $t1, $t1, $v0        # pegando o imm e colocando no t1
+            add $a0, $v1, $zero
+            jal get_reg
+            sll $v0, $v0, 21
+            or $t1, $t1, $v0        # pegando o rs
+            li $v0, 1
+            j end_get_instruction
+
+    GIfamS:
+        beq $t2, 'u', GIcaseSub
+        beq $t2, 'l', GIcaseSl
+        beq $t2, 'r', GIcaseSr
+        beq $t2, 'w', GIisSw
+        j not_inst          # se nao passou em nenhum caso, nao e inst
+        GIcaseSub:
+            addi $t0, $t0, 1
+            lbu $t3, 0($t0)
+            beq $t3, ' ', GIisSub
+            beq $t3, 'u', GIisSubu
+            j not_inst          # se nao passou em nenhum caso, nao e inst
+            GIisSub:
+                li $t1, 0x00000022
+
+                add $a0, $t0, $zero # prepara o a0 pra funct
+                jal get_reg           # chamo get_reg pra pegar o primeiro reg
+                sll $v0, $v0, 11    # ponho o primeiro reg (rd) no campo dele
+                or $t1, $t1, $v0    # junto com o op code ja em t1
+                add $a0, $v1, $zero # pra procurar o proximo reg, passo como argumento o endereco depois do primeiro reg
+                jal get_reg
+                sll $v0, $v0, 21    # por o rs no campo dele
+                or $t1, $t1, $v0    # junto no t1
+                add $a0, $v1, $zero 
+                jal get_reg
+                sll $v0, $v0, 16    # por o rt no campo 
+                or $t1, $t1, $v0
+                li $v0, 1
+                j end_get_instruction
+            GIisSubu:
+                li $t1, 0x00000023
+                
+                add $a0, $t0, $zero # prepara o a0 pra funct
+                jal get_reg           # chamo get_reg pra pegar o primeiro reg
+                sll $v0, $v0, 11    # ponho o primeiro reg (rd) no campo dele
+                or $t1, $t1, $v0    # junto com o op code ja em t1
+                add $a0, $v1, $zero # pra procurar o proximo reg, passo como argumento o endereco depois do primeiro reg
+                jal get_reg
+                sll $v0, $v0, 21    # por o rs no campo dele
+                or $t1, $t1, $v0    # junto no t1
+                add $a0, $v1, $zero 
+                jal get_reg
+                sll $v0, $v0, 16    # por o rt no campo 
+                or $t1, $t1, $v0
+                li $v0, 1
+                j end_get_instruction
+
+        GIcaseSl:
+            lbu $t3, 0($t0)
+            beq $t3, 'l', GIisSll
+            beq $t3, 't', GIisSlt
+            j not_inst          # se nao passou em nenhum caso, nao e inst
+            GIisSll:
+                li $t1, 0x00000000
+                
+                add $a0, $t0, $zero # prepara o a0 pra funct
+                jal get_reg           # chamo get_reg pra pegar o primeiro reg
+                sll $v0, $v0, 11    # ponho o primeiro reg (rd) no campo dele
+                or $t1, $t1, $v0    # junto com o op code ja em t1
+                add $a0, $v1, $zero # pra procurar o proximo reg, passo como argumento o endereco depois do primeiro reg
+                jal get_reg
+                sll $v0, $v0, 16    # por o rt no campo dele
+                or $t1, $t1, $v0    # junto no t1
+                add $a0, $v1, $zero
+                jal get_imm           # pegar o immediate
+                sll $v0, $v0, 6
+                or $t1, $t1, $v0    # colocar o immediate no campo dele
+                li $v0, 1
+                j end_get_instruction
+            GIisSlt:
+                li $t1, 0x0000002a
+                
+                add $a0, $t0, $zero # prepara o a0 pra funct
+                jal get_reg           # chamo get_reg pra pegar o primeiro reg
+                sll $v0, $v0, 11    # ponho o primeiro reg (rd) no campo dele
+                or $t1, $t1, $v0    # junto com o op code ja em t1
+                add $a0, $v1, $zero # pra procurar o proximo reg, passo como argumento o endereco depois do primeiro reg
+                jal get_reg
+                sll $v0, $v0, 21    # por o rs no campo dele
+                or $t1, $t1, $v0    # junto no t1
+                add $a0, $v1, $zero 
+                jal get_reg
+                sll $v0, $v0, 16    # por o rt no campo 
+                or $t1, $t1, $v0
+                li $v0, 1
+                j end_get_instruction
+
+        GIcaseSr:
+            lbu $t3, 0($t0)
+            beq $t3, 'l', GIisSrl
+            beq $t3, 'a', GIisSrav
+            j not_inst          # se nao passou em nenhum caso, nao e inst
+            GIisSrl:
+                li $t1, 0x00000002
+                
+                add $a0, $t0, $zero # prepara o a0 pra funct
+                jal get_reg           # chamo get_reg pra pegar o primeiro reg
+                sll $v0, $v0, 11    # ponho o primeiro reg (rd) no campo dele
+                or $t1, $t1, $v0    # junto com o op code ja em t1
+                add $a0, $v1, $zero # pra procurar o proximo reg, passo como argumento o endereco depois do primeiro reg
+                jal get_reg
+                sll $v0, $v0, 16    # por o rt no campo dele
+                or $t1, $t1, $v0    # junto no t1
+                add $a0, $v1, $zero
+                jal get_imm           # pegar o immediate
+                sll $v0, $v0, 6
+                or $t1, $t1, $v0    # colocar o immediate no campo dele
+                li $v0, 1
+                j end_get_instruction
+            GIisSrav:
+                li $t1, 0x00000007
+
+                add $a0, $t0, $zero
+                jal get_reg
+                sll $v0, $v0, 11        # por rd no lugar
+                or $t1, $t1, $v0
+                add $a0, $v1, $zero
+                jal get_reg
+                sll $v0, $v0, 21        # por rs no lugar
+                or $t1, $t1, $v0
+                add $a0, $v1, $zero
+                jal get_reg
+                sll $v0, $v0, 16        # por rt no lugar
+                or $t1, $t1, $v0
+                
+                j end_get_instruction
+        GIisSw:
+            li $t1, 0x8c000000
+            
+            add $a0, $t0, $zero
+            jal get_reg
+            sll $v0, $v0, 16
+            or $t1, $t1, $v0        # pegando o rt, colocando na posicao certa e juntando ao t1
+            add $a0, $v1, $zero
+            jal get_imm
+            sll $v0, $v0, 16    # apaga (por seguranca) o upper immediate 
+            srl $v0, $v0, 16    # retorna o lower immediate pra posicao correta
+            or $t1, $t1, $v0        # pegando o imm e colocando no t1
+            add $a0, $v1, $zero
+            jal get_reg               
+            sll $v0, $v0, 21
+            or $t1, $t1, $v0        # pegando o rs
+            li $v0, 1
+            j end_get_instruction
+
+    GIfamB:
+        beq $t2, 'e', GIisBeq
+        beq $t2, 'n', GIisBne
+        beq $t2, 'g', GIisBgez
+        j not_inst          # se nao passou em nenhum caso, nao e inst
+        GIisBeq:
+            li $t1, 0x10000000
+            
+            add $a0, $t0, $zero
+            jal get_reg
+            sll $v0, $v0, 21
+            or $t1, $t1, $v0        # pegando o rs, colocando na posicao certa e juntando ao t1
+            add $a0, $v1, $zero
+            jal get_reg
+            sll $v0, $v0, 16
+            or $t1, $t1, $v0        # pegando o rt, colocando na posicao e juntando ao t1
+            add $a0, $v1, $zero
+            jal get_label_use
+            or $t1, $t1, $v0        # pegando a label e colocando no t1
+            li $v0, 1
+            j end_get_instruction
+        GIisBne:
+            li $t1, 0x14000000
+            
+            add $a0, $t0, $zero
+            jal get_reg
+            sll $v0, $v0, 21
+            or $t1, $t1, $v0        # pegando o rs, colocando na posicao certa e juntando ao t1
+            add $a0, $v1, $zero
+            jal get_reg
+            sll $v0, $v0, 16
+            or $t1, $t1, $v0        # pegando o rt, colocando na posicao e juntando ao t1
+            add $a0, $v1, $zero
+            jal get_label_use
+            or $t1, $t1, $v0        # pegando a label e colocando no t1
+            li $v0, 1
+            j end_get_instruction
+        GIisBgez:
+            li $t1, 0x04010000
+            
+            add $a0, $t0, $zero
+            jal get_reg
+            sll $v0, $v0, 21
+            or $t1, $t1, $v0        # pegando o rs, colocando na posicao certa e juntando ao t1
+            add $a0, $v1, $zero
+            jal get_label_use
+            or $t1, $t1, $v0        # pegando a label e colocando no t1
+            li $v0, 1
+            j end_get_instruction
+
+    GIfamM:
+        beq $t2, 'u', GIisMult
+        beq $t2, 'f', GIcaseMf
+        j not_inst          # se nao passou em nenhum caso, nao e inst
+        GIisMult:
+            li $t1, 0x00000018
+            
+            add $a0, $t0, $zero # prepara o a0 pra funct
+            jal get_reg
+            sll $v0, $v0, 21    # por o rs no campo dele
+            or $t1, $t1, $v0    # junto no t1
+            add $a0, $v1, $zero 
+            jal get_reg
+            sll $v0, $v0, 16    # por o rt no campo 
+            or $t1, $t1, $v0
+            li $v0, 1
+            j end_get_instruction
+        GIcaseMf:
+            lbu $t3, 0($t0)
+            beq $t3, 'h', GIisMfhi
+            beq $t3, 'l', GIisMflo
+            j not_inst          # se nao passou em nenhum caso, nao e inst
+            GIisMfhi:
+                li $t1, 0x00000010
+                
+                add $a0, $t0, $zero # prepara o a0 pra funct
+                jal get_reg           # chamo get_reg pra pegar o primeiro reg
+                sll $v0, $v0, 11    # ponho o primeiro reg (rd) no campo dele
+                or $t1, $t1, $v0    # junto com o op code ja em t1
+                li $v0, 1
+                j end_get_instruction
+            GIisMflo:
+                li $t1, 0x00000012
+                
+                add $a0, $t0, $zero # prepara o a0 pra funct
+                jal get_reg           # chamo get_reg pra pegar o primeiro reg
+                sll $v0, $v0, 11    # ponho o primeiro reg (rd) no campo dele
+                or $t1, $t1, $v0    # junto com o op code ja em t1
+                li $v0, 1
+                j end_get_instruction
+
+    GIfamO:
+        lbu $t3 0($t0)
+        beq $t3, ' ', GIisOr
+        beq $t3, 'i', GIisOri
+        j not_inst          # se nao passou em nenhum caso, nao e inst
+        GIisOr: 
+            li $t1, 0x00000025
+            
+            add $a0, $t0, $zero # prepara o a0 pra funct
+            jal get_reg           # chamo get_reg pra pegar o primeiro reg
+            sll $v0, $v0, 11    # ponho o primeiro reg (rd) no campo dele
+            or $t1, $t1, $v0    # junto com o op code ja em t1
+            add $a0, $v1, $zero # pra procurar o proximo reg, passo como argumento o endereco depois do primeiro reg
+            jal get_reg
+            sll $v0, $v0, 21    # por o rs no campo dele
+            or $t1, $t1, $v0    # junto no t1
+            add $a0, $v1, $zero 
+            jal get_reg
+            sll $v0, $v0, 16    # por o rt no campo 
+            or $t1, $t1, $v0
+            li $v0, 1
+            j end_get_instruction
+        GIisOri:
+            li $t1, 0x34000000
+            
+            add $a0, $t0, $zero # prepara o a0 pra funct
+            jal get_reg           # chamo get_reg pra pegar o primeiro reg
+            sll $v0, $v0, 16    # ponho o primeiro reg (rt) no campo dele
+            or $t1, $t1, $v0    # junto com o op code ja em t1
+            add $a0, $v1, $zero # pra procurar o proximo reg, passo como argumento o endereco depois do primeiro reg
+            jal get_reg
+            sll $v0, $v0, 21    # por o rs no campo dele
+            or $t1, $t1, $v0    # junto no t1
+            add $a0, $v1, $zero
+            jal get_imm           # pegar o immediate
+            sll $v0, $v0, 16    # apaga (por seguranca) o upper immediate 
+            srl $v0, $v0, 16    # retorna o lower immediate pra posicao correta
+            or $t1, $t1, $v0    # colocar o immediate no campo dele
+            li $v0, 1
+            j end_get_instruction
+
+    GIfamX:
+        lbu $t3 1($t0)      # pegando o quarto char pra diferenciar xori de xor
+        beq $t3, ' ', GIisXor
+        beq $t3, 'i', GIisXori
+        j not_inst          # se nao passou em nenhum caso, nao e inst
+        GIisXor:
+            li $t1, 0x00000026
+            
+            add $a0, $t0, $zero # prepara o a0 pra funct
+            jal get_reg           # chamo get_reg pra pegar o primeiro reg
+            sll $v0, $v0, 11    # ponho o primeiro reg (rd) no campo dele
+            or $t1, $t1, $v0    # junto com o op code ja em t1
+            add $a0, $v1, $zero # pra procurar o proximo reg, passo como argumento o endereco depois do primeiro reg
+            jal get_reg
+            sll $v0, $v0, 21    # por o rs no campo dele
+            or $t1, $t1, $v0    # junto no t1
+            add $a0, $v1, $zero 
+            jal get_reg
+            sll $v0, $v0, 16    # por o rt no campo 
+            or $t1, $t1, $v0
+            li $v0, 1
+            j end_get_instruction
+        GIisXori:
+            li $t1, 0x38000000
+            
+            add $a0, $t0, $zero # prepara o a0 pra funct
+            jal get_reg           # chamo get_reg pra pegar o primeiro reg
+            sll $v0, $v0, 16    # ponho o primeiro reg (rt) no campo dele
+            or $t1, $t1, $v0    # junto com o op code ja em t1
+            add $a0, $v1, $zero # pra procurar o proximo reg, passo como argumento o endereco depois do primeiro reg
+            jal get_reg
+            sll $v0, $v0, 21    # por o rs no campo dele
+            or $t1, $t1, $v0    # junto no t1
+            add $a0, $v1, $zero
+            jal get_imm           # pegar o immediate
+            sll $v0, $v0, 16    # apaga (por seguranca) o upper immediate 
+            srl $v0, $v0, 16    # retorna o lower immediate pra posicao correta
+            or $t1, $t1, $v0    # colocar o immediate no campo dele
+            li $v0, 1
+            j end_get_instruction
+        
+    GIisNor:
+        li $t1, 0x9c000000
+
+        add $a0, $t0, $zero     # prepara o endereco pra funct
+        jal get_reg
+        sll  $v0, $v0, 11       # poe o reg rd no campo certo
+        or $t1, $t1, $v0        # poe o rd no hexa do t1
+        add $a0, $v1, $zero     # prepara o endereco pra prox funct
+        jal get_reg
+        sll $v0, $v0, 21        # poe o rs no campo certo
+        or $t1, $t1, $v0        # poe o rs no hexa
+        add $a0, $v1, $zero     # prepara endereco p prox funct
+        jal get_reg               
+        sll $v0, $v0, 16        # poe o rt no campo certo
+        or $t1, $t1, $v0        # poe o rt no hexa
+        li $v0, 1
+        j end_get_instruction
+    GIisDiv:
+        li $t1, 0x0000001a
+        
+        add $a0, $t0, $zero # prepara o a0 pra funct
+        jal get_reg
+        sll $v0, $v0, 21    # por o rs no campo dele
+        or $t1, $t1, $v0    # junto no t1
+        add $a0, $v1, $zero 
+        jal get_reg
+        sll $v0, $v0, 16    # por o rt no campo 
+        or $t1, $t1, $v0
+        li $v0, 1
+        j end_get_instruction
+    GIisClo:
+        li $t1, 0x1c000021
+
+        add $a0, $t0, $zero
+        jal get_reg
+        sll $v0, $v0, 11
+        or $t1, $t1 $v0         # pegar o rd e guardar em t1 na posicao certa
+        add $a0, $v1, $zero
+        jal get_reg
+        sll $v0, $v0, 21
+        or $t1, $t1, $v0        # pegar o rs e guardar em t1 na posicao certa
+        li $v0, 1
+        j end_get_instruction
+
+    not_inst:
+        li $v0, 0
+
+    end_get_instruction:
+        # ao chegar aqui, por meio das procedure secundarias, o v1 ja contem o endereco do char apos a instrucao.
+        # v0 = 0 (caso nao seja uma instrucao), 1 (caso seja uma instrucao nativa ou pseudo de uma instr so), ou
+        # 2 (caso a pseudo use duas instr nativas)
+        # t1 = o hexa da instrucao. se v0 = 2, t2 contera a segunda instrucao
+
+        beq $v0, $zero, go_end_GI
+        la $t3, int_found
+        sw $t1, 0($t3)
+        beq $v0, 1, go_end_GI 
+        sw $t2, 0($t3)        
+
+        go_end_GI:
+
+        lw $t0, 0($sp)      ###
+        lw $t1, 4($sp)      # 
+        lw $t2, 8($sp)      # devolve stack
+        lw $t3, 12($sp)     #
+        addi $sp, $sp, 16   ###
+
+    jr $ra
+# fim da funcao pra identificar a instrucao
+
+
 ######## FUNCAO PARA ACHAR O NUMERO DE UM REGISTRADOR
-# t0 = endereco de algum ponto da string antes do reg
-# t1 = em primeira instancia, o primeiro digito do reg. apos verificar de qual 'familia' o reg e, 
-#	t1 vai ser o comparador do segundo digito (economia de reg
-# t2 = na primeira parte, sera o comparador do primeiro digito do reg
-# t3 = vai guardar o segundo digito do reg
+# a0 = endereco de algum ponto da string antes do reg
 # v0 = retorno com o valor (numero) do reg
 # v1 = retorno com o endereco na string apos o reg
 #
 
 get_reg:
-	addi $sp, $sp, -16   	####
-	sw $t0, 0($sp)		# preparando a stack
-	sw $t1, 4($sp)		#
-	sw $t2, 8($sp)		#
-	sw $t3, 12($sp)		####
+	addi $sp, $sp, -16   		####
+	sw $t0, 0($sp)				# preparando a stack
+	sw $t1, 4($sp)				#
+	sw $t2, 8($sp)				#
+	sw $t3, 12($sp)				####
 
-# do funct
+	addi $t0, $a0, $zero	# coloca em t0 o argumento de a0
 	addi $t2, $zero, '$'	# $t2 = '$', para comparar e checar se encontrou um reg
 	
-GRloop:
-	lbu $t1, 0($t0)			#	ler char por char (byte por byte) | $t1 = um byte (char) da string
-	addi $t0, $t0, 1		# próximo byte
-	bne $t2, $t1, GRloop 		# enquanto eu nao encontrar um '$' eu continuo procurando
+	GRloop:
+		lbu $t1, 0($t0)				#	ler char por char (byte por byte) | $t1 = um byte (char) da string
+		addi $t0, $t0, 1			# pr�ximo byte
+		bne $t2, $t1, GRloop 		# enquanto eu nao encontrar um '$' eu continuo procurando
 	
-	lbu $t1, 0($t0)			#	ler char depois do '$' para checar qual reg usado
-	addi $t0, $t0, 1		# próximo byte
-	
-	lbu $t3, 0($t0)			# 	para evitar repeticoes, ja guardo aqui o segundo
-	addi $t0, $t0, 1		# digito do reg, e o endereco de retorno logo apos o reg (em t3).
+	lbu $t1, 0($t0)				#	ler char depois do '$' para checar qual reg usado
+	addi $t0, $t0, 1			# pr�ximo byte
+
+	lbu $t3, 0($t0)				# 	para evitar repeticoes, ja guardo aqui o segundo
+	addi $t0, $t0, 1			# digito do reg, e o endereco de retorno logo apos o reg (em t3).
 	add $v1, $zero, $t0		# v1 ja tem o endereco de retorno apos o reg
 	
 	addi $t2, $zero, 'v'	####
@@ -1146,13 +1784,13 @@ GRloop:
 	beq $t1, $t2, GRfamR	#
 	addi $t2, $zero, 'g'	#
 	beq $t1, $t2, GRfamG	#
-	addi $t2, $zero, 'f'	#	caso so tenha um reg na 
+	addi $t2, $zero, 'f'	#		caso so tenha um reg na 
 	beq $t1, $t2, GRfamF	# familia 'n', nao ha mais testes.
 	addi $t2, $zero, 'z'	# so atribui o v0 e encerra a funcao.
 	beq $t1, $t2, GRfamZ	####
 
-# 	como a informacao em t1 nao e mais relevante, vou alterar seu
-#	valor para encontrar qual dos membros da familia 'n' e o reg atual.
+	# 	como a informacao em t1 nao e mais relevante, vou alterar seu
+	#	valor para encontrar qual dos membros da familia 'n' e o reg atual.
 
 	GRfamR:
 		addi $v0, $zero, 31
@@ -1164,29 +1802,29 @@ GRloop:
 		addi $v0, $zero, 30
 		j end_get_reg
 	GRfamZ:
-		addi $v1, $v1, 2	# o v1 guarda o endereco duas casas apos o '$', mas o zero e o unico reg com 4 casas. hence this
+		addi $v1, $v1, 2			# o v1 guarda o endereco duas casas apos o '$', mas o zero e o unico reg com 4 casas. hence this
 		addi $v0, $zero, 0
 		j end_get_reg
 	###### famV
 	GRfamV:
 		addi $t1, $zero, '0'	# t1 = 0, para testar se e o reg v0
-		beq $t1, $t3, GRV0	# se for igual, o reg e v0, retorna valor 2 no v0 (retorno da func)
-		addi $v0, $zero, 3	# se t3 nao for 0, so pode ser 1, entao e o reg v1. retorno da func sera 3
+		beq $t1, $t3, GRV0		# se for igual, o reg e v0, retorna valor 2 no v0 (retorno da func)
+		addi $v0, $zero, 3		# se t3 nao for 0, so pode ser 1, entao e o reg v1. retorno da func sera 3
 		j end_get_reg
-	GRV0: 
-		addi $v0, $zero, 2
-		j end_get_reg
+		GRV0: 
+			addi $v0, $zero, 2
+			j end_get_reg
 	###### end famV
 	###### famA
 	GRfamA:
 		addi $t1, $zero, 't'
-		beq $t1, $t3, GRAT	# checando se o t3 tem um 't' nele, se sim, e o reg at... e por ai vai
+		beq $t1, $t3, GRAT			# checando se o t3 tem um 't' nele, se sim, e o reg at... e por ai vai
 		addi $t1, $zero, '0'
 		beq $t1, $t3, GRA0
 		addi $t1, $zero, '1'
 		beq $t1, $t3, GRA1
 		addi $t1, $zero, '2'
-		beq $t1, $t3, GRA2	# se passou de todos os testes, a unica possibilidade e o a3, valor 7
+		beq $t1, $t3, GRA2			# se passou de todos os testes, a unica possibilidade e o a3, valor 7
 		addi $v0, $zero, 7
 		j end_get_reg
 
@@ -1205,7 +1843,7 @@ GRloop:
 	###### end famA
 	###### famT
 	GRfamT:
-		addi $t1, $zero, '0'	# checa qual da familia do 't' é o reg atual... e por ai vai
+		addi $t1, $zero, '0'	# checa qual da familia do 't' � o reg atual... e por ai vai
 		beq $t1, $t3, GRT0
 		addi $t1, $zero, '1'
 		beq $t1, $t3, GRT1
@@ -1221,7 +1859,7 @@ GRloop:
 		beq $t1, $t3, GRT6
 		addi $t1, $zero, '7'
 		beq $t1, $t3, GRT7
-		addi $t1, $zero, '8'	# se nao passar em nenhum caso até agora, a unica possibilidade e ser o t9
+		addi $t1, $zero, '8'	# se nao passar em nenhum caso at� agora, a unica possibilidade e ser o t9
 		beq $t1, $t3, GRT8
 		addi $v0, $zero, 25
 		j end_get_reg
@@ -1312,16 +1950,17 @@ GRloop:
 			j end_get_reg
 	###### end famK
 	
-# done funct
+	# done funct
 	
-end_get_reg:				# ao chegar aq, v0 = numero do reg, v1 = endereco da string logo apos o reg
-	lw $t3, 12($sp)			####
-	lw $t2, 8($sp)			#
-	lw $t1, 4($sp)			# retornando a stack
-	lw $t0, 0($sp)			#
-	addi $sp, $sp, 16		####
+	end_get_reg:						# ao chegar aq, v0 = numero do reg, v1 = endereco da string logo apos o reg
+		lw $t3, 12($sp)				####
+		lw $t2, 8($sp)				#
+		lw $t1, 4($sp)				# retornando a stack
+		lw $t0, 0($sp)				#
+		addi $sp, $sp, 16			####
 	
-	jr $ra
-######## fim da funcao pra achar o numero do registrador
+	jr $ra 
 
+######## fim da funcao pra achar o numero do registrador
+		
 # read file code from https://stackoverflow.com/questions/37469323/assembly-mips-read-text-from-file-and-buffer/37505359#37505359
