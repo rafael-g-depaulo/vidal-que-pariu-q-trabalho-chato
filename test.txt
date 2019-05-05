@@ -5,7 +5,7 @@ _my_label_label3: .word 0x54
 
 .text
 
-li $t0, 23340000019
+li $t0, 2334
 lw $t1, 0($t0)
 lw $t2, 4($t0)
 lw $t3, 8($t0)

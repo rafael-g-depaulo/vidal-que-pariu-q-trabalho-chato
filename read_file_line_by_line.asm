@@ -44,7 +44,8 @@ newline:      				.word 	'\n'
 line:									.asciiz	"linha: "
 lineend:							.asciiz "linha acabou."
 
-.text
+.text	
+
 	# get filename
 	jal get_file_name
 	
@@ -64,6 +65,20 @@ lineend:							.asciiz "linha acabou."
 
 	lw $t0, int_found		# load instruction found
 	
+		# # instrucoes do arquivo teste.
+		# li $t0, 2334
+		# lw $t1, 0($t0)
+		# lw $t2, 4($t0)
+		# lw $t3, 8($t0)
+		# clo $t1, $t2
+		# add $t1, $t2, $t3
+		# xor $t4, $t1, $t2
+		# addi $t5, $t4, 10
+		# xori $t6, $t5, 20
+		# sw $t4, 0($t0)
+		# sw $t5, 4($t0)
+		# sw $t6, 8($t0)
+
 	# # transcribe data test
 	# la $a0, data_test
 	# jal transcribe_data
@@ -1118,11 +1133,12 @@ line_done:
 
 get_instruction:
 
-    addi $sp, $sp, -16  ###
+    addi $sp, $sp, -20  ###
     sw $t0, 0($sp)      # 
     sw $t1, 4($sp)      # prepara stack
-    sw $t2, 8($sp)      # 
-    sw $t3, 12($sp)     ###
+    sw $t2, 8($sp)      #
+    sw $t3, 12($sp)     # 
+    sw $ra, 16($sp)			###
 
 
     add $t0, $a0, $zero # prepara reg para ser usado em vez do a0
@@ -1738,7 +1754,7 @@ get_instruction:
         la $t3, int_found
         sw $t1, 0($t3)
         beq $v0, 1, go_end_GI 
-        sw $t2, 0($t3)        
+        sw $t2, 4($t3)        
 
         go_end_GI:
 
@@ -1746,7 +1762,8 @@ get_instruction:
         lw $t1, 4($sp)      # 
         lw $t2, 8($sp)      # devolve stack
         lw $t3, 12($sp)     #
-        addi $sp, $sp, 16   ###
+        lw $ra, 16($sp)			#
+        addi $sp, $sp, 20   ###
 
     jr $ra
 # fim da funcao pra identificar a instrucao
