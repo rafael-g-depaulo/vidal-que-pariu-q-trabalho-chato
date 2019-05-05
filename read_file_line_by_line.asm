@@ -58,12 +58,14 @@ lineend:							.asciiz "linha acabou."
 	jal parse_data
 	
 	lw $a0, text_start
-	lw $a1, text_end
+	addi $a0, $a0, 4
+	lui $a1, 0x0400
+	jal dec_label_line
 
-	addi $a0, $a0, 4		# get first line
-	jal get_instruction	# get instruction from line
+	# addi $a0, $a0, 4		# get first line
+	# jal get_instruction	# get instruction from line
 
-	lw $t0, int_found		# load instruction found
+	# lw $t0, int_found		# load instruction found
 	
 		# # instrucoes do arquivo teste.
 		# li $t0, 2334
@@ -195,6 +197,82 @@ print_line:
 	addi $sp, $sp, 12
 	
 	jr $ra # return
+
+# FUNCAO QUE PERCORRE UMA LINHA INTEIRA DO .text, DECLARA LABELS ACHADAS E CONTA AS INSTRUCOES ACHADAS 
+dec_label_line:
+# $a0: ponteiro para o início da linha
+# $a1: ponteiro da posicao da proxima (primeira) instrucao a ser lida nessa linha (0x0040000 + 4* numero da instrucao)
+# $v0: ponteiro da posicao da proxima instrucao a ser lida na proxima linha
+
+	# push to stack
+	subi $sp, $sp, 24
+	sw $v1,  0($sp) 	# function calls
+	sw $a0,  4($sp)		# pointer to line, function calls
+	sw $a1,  8($sp)		# function calls
+	sw $t0, 12($sp)		# aux to hold char read, copy of a1
+	sw $t1, 16($sp)		# copy of a0
+	sw $ra, 20($sp)		# function calls
+	
+	dll_loop1:											# percorre linha ate achar nao whitespace
+	lbu $t0, 0($a0)									# get char
+	addi $a0, $a0, 1								# increase pointer
+	beq $t0, ' ', dll_loop1					# while not whitespace
+	beq $t0, '\t', dll_loop1				# while not whitespace
+	beq $t0, '\n', dll_loop1				# while not whitespace
+	beq $t0, '\0', dll_end_of_line	# if found end of line, pop and return
+
+	subi $a0, $a0, 1			# move back pointer to point to first non-whitespace char
+	move $t1, $a0					# save $a0
+
+	# non-whitespace found, look if label or instruction
+	dll_loop2:
+	lbu $t0, 0($t1)				# get char
+	addi $t1, $t1, 1			# increase pointer
+	beq $t0, ':', dll_found_label	# if found :, is label dec
+	beq $t0, ' ', dll_found_instr	# if found ' ', is instr
+	j dll_loop2						# get next char
+
+	dll_found_label:
+	# get label string
+	jal get_label_dec			# get label dec
+	move $a0, $v1					# set pointer to after label dec
+
+	# insert label on label list
+	move $t0, $a0					# save a0
+	move $t1, $a1					# save a1
+
+	la $a1, label_dec_str	# load address to label string
+	move $a0, $t1					# load instruction address
+	jal insert_label			# add label to label list
+
+	move $a0, $t0					# load $a0
+	move $a1, $t1					# load $a1
+
+	j dll_loop1						# get next instruction/label
+
+	dll_found_instr:
+	# get instruction
+	jal get_instruction
+
+	sll $v0, $v0, 2				# multiply number of instructions found by 4
+	add $a1, $a1, $v0			# set up instruction pointer for next instruction 
+	move $a0, $v1					# set up line pointer to after instruction
+
+	j dll_loop1						# get next instruction/label
+
+	dll_end_of_line:
+	# pop from stack
+	move $v0, $a1			# set up return value
+	
+	lw $v1,  0($sp) 	# function calls
+	lw $a0,  4($sp)		# pointer to line, function calls
+	lw $a1,  8($sp)		# function calls
+	lw $t0, 12($sp)		# aux to hold char read, copy of a1
+	lw $t1, 16($sp)		# copy of a0
+	lw $ra, 20($sp)		# function calls
+	addi $sp, $sp, 24
+
+	jr $ra 		# return
 
 # FUNCAO QUE PERCORRE A LISTA DE LINHAS DO .data, E CHAMA "transcribe_data" EM TODAS ELAS
 parse_data:
@@ -1130,7 +1208,6 @@ line_done:
 # v0: 
 # v1: ponteiro para proximo char depois da instrucao
 #
-
 get_instruction:
 
     addi $sp, $sp, -20  ###
@@ -1774,7 +1851,6 @@ get_instruction:
 # v0 = retorno com o valor (numero) do reg
 # v1 = retorno com o endereco na string apos o reg
 #
-
 get_reg:
 	addi $sp, $sp, -16   		####
 	sw $t0, 0($sp)				# preparando a stack
