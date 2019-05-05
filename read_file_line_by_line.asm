@@ -1,5 +1,6 @@
 .data
 
+ascii_convert_test:		.space 16
 # USED BY "get_instruction"
 int_found:						.word		0, 0
 # USED BY "transcribe_data"
@@ -45,7 +46,28 @@ newline:      				.word 	'\n'
 line:									.asciiz	"linha: "
 lineend:							.asciiz "linha acabou."
 
-.text	
+# USED BY "create_data_file"
+filename_test:				.asciiz "Code/Trabalho/testfile_data.mif"
+data_file_header:			.ascii	"DEPTH = 4096;\nWIDTH = 32;\nADDRESS_RADIX = HEX;\nDATA_RADIX = HEX;\nCONTENT\nBEGIN\n"
+data_file_header_end:
+data_file_footer:			.ascii 	"\nEND;\n"
+data_file_footer_end:
+
+
+.text
+
+	li $a0, 0x0a1b2c3d
+	la $a1, ascii_convert_test
+	jal get_ascii_from_hex
+
+	li $a0, 0x4e5f6789
+	addi $a1, $a1, 9
+	jal get_ascii_from_hex
+
+	la $t0, ascii_convert_test
+
+	li $v0, 10
+	syscall
 
 	# get filename
 	jal get_file_name
@@ -64,36 +86,9 @@ lineend:							.asciiz "linha acabou."
 	move $a0, $v0		# set up how many instructions to load in memory
 	jal get_dot_text
 
-	# # print lines test
-	# move $a0, $v0
-	# la $a1, print_line
-	# jal read_file_lines
-	
-	# # count lines test
-	# move $a0, $v0
-	# la $a1, count_lines
-	# li $a2, 0
-	# jal read_file_lines
+	# write .data file
 
-	# # print return value
-	# move $a0, $v0
-	# li $v0, 1
-	# syscall
-
-	# # insert data text test
-	# la $a0, line1
-	# li $a1, 0
-	# jal insert_data_text
-
-	# la $a0, line2
-	# move $a1, $v0
-	# jal insert_data_text
-	# la $a0, line3
-	# move $a1, $v0
-	# jal insert_data_text
-	# la $a0, line4
-	# move $a1, $v0
-	# jal insert_data_text
+	# write .text file
 
 	# end program
 	li $v0, 10
@@ -174,6 +169,104 @@ print_line:
 	addi $sp, $sp, 12
 	
 	jr $ra # return
+
+# FUNCAO QUE CRIA E INICIALIZA O ARQUIVO (filename)_data.mif
+create_data_file:
+# $a0: file name string
+
+	# push to stack
+	# $v0: sycalls
+	# $a0: sycalls, file descriptor
+	# $a1: sycalls
+	# $a2: sycalls
+	# $ra: function calls
+
+	la $a0, filename_test	# TEMPORARY: temp file name
+
+	# create file
+	li $v0, 13			# syscall to open file
+	li $a1, 1				# write flag
+	li $a2, 0				# mode
+	syscall  				# file descriptor returned in $v0
+
+	# write file headers
+	move $a0, $v0
+	li $v0, 15
+	la $a1, data_file_header
+	la $a2, data_file_header_end
+	subu $a2, $a2, $a1
+	syscall
+
+	# TODO:
+	# write to file .data content
+
+	# write file footers
+	move $a0, $v0
+	li $v0, 15
+	la $a1, data_file_footer
+	la $a2, data_file_footer_end
+	subu $a2, $a2, $a1
+	syscall
+
+	# close file
+  # $a0 already has file descriptor
+	li $v0, 16
+  syscall
+	
+	# pop from stack
+
+	jr $ra	# return
+
+# FUNCAO QUE RECEBE UMA WORD E CONVERTE PRA UMA STRING EM ASCII
+get_ascii_from_hex:
+# $a0: word pra ser convertida em ascii
+# $a1: pointer to where to write
+
+	# push to stack
+	subi $sp, $sp, 20
+	sw $a0,  0($sp) # word to be read
+	sw $a1,  4($sp) # pointer to write buffer
+	sw $t0,  8($sp) # aux hex digit
+	sw $t1, 12($sp) # flag for comparison
+	sw $s0, 16($sp) # copy of a1
+
+	move $s0, $a1				# save pointer to first by to be written
+	addi $a1, $a1, 7		# move pointer to last byte to be written
+
+	gaf_loop:						# get digit loop
+	andi $t0, $a0, 0xF	# get last hex digit
+	srl $a0, $a0, 4			# remove char from $a0
+	
+	# get ascii equivalent of hex digit
+	# if 0-9
+	li $t1, 0xa
+	slt $t1, $t0, $t1
+	beq $t1, $zero, gaf_not_digit
+	addi $t0, $t0, '0'	# transform t0 from number to char representing the digit
+	j gaf_write_char
+
+	gaf_not_digit:
+	# if a-f
+	subi $t0, $t0, 10
+	addi $t0, $t0, 'a'
+	gaf_write_char:
+
+	# write char to buffer
+	sb $t0, 0($a1)				# write char
+	beq $a1, $s0, gaf_end	# if wrote last char, end
+	subi $a1, $a1, 1			# get next digit
+	j gaf_loop
+
+	gaf_end:
+	# pop from stack
+	lw $a0,  0($sp) # word to be read
+	lw $a1,  4($sp) # pointer to write buffer
+	lw $t0,  8($sp) # aux hex digit
+	lw $t1, 12($sp) # flag for comparison
+	lw $s0, 16($sp) # copy of a1
+	addi $sp, $sp, 20
+
+	jr $ra	# return
 
 # FUNCAO QUE PERCORRE A LISTA DE LINHAS DO .text E ESCREVE O HEXA CORRESPONDENDE DELAS NA MEMORIA
 get_dot_text:
@@ -1723,7 +1816,7 @@ get_instruction:
                 
                 j end_get_instruction
         GIisSw:
-            li $t1, 0x8c000000
+            li $t1, 0xac000000
             
             add $a0, $t0, $zero
             jal get_reg
