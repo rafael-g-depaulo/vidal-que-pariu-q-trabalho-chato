@@ -469,12 +469,15 @@ get_dot_text:
 # $v0: address of instruction vector
 
 	# push to stack
-	subi $sp, $sp, 20
+	subi $sp, $sp, 24
 	sw $a0,  0($sp)	# function calls
 	sw $a1,  4($sp)	# function calls
 	sw $t0,  8($sp)	# pointer to list element
 	sw $t1, 12($sp)	# copy of .text vector pointer
-	sw $ra, 16($sp)	# function calls
+	sw $a2, 16($sp)	# function calls, address of instructions being read
+	sw $ra, 20($sp)	# function calls
+
+	lui $a2, 0x0040	# load address of first instruction
 
 	# allocate vector in heap
 	sll $a0, $a0, 2	# allocate 4 bytes for every instruction to be written
@@ -490,6 +493,7 @@ get_dot_text:
 	addi $a0, $t0, 4				# load element.line (string of the .text line)
 	jal get_text_line				# get the line's instruction's hexa code
 	move $a1, $v0						# set up write pointer
+	move $a2, $v1						# load next instruction address
 	lw $t0, 0($t0)					# set element.next as next element
 	j gdt_loop
 
@@ -501,8 +505,9 @@ get_dot_text:
 	lw $a1,  4($sp)	# function calls
 	lw $t0,  8($sp)	# pointer to list element
 	lw $t1, 12($sp)	# copy of .text vector pointer
-	lw $ra, 16($sp)	# function calls
-	addi $sp, $sp, 20
+	lw $a2, 16($sp)	# address of instructions being read
+	lw $ra, 20($sp)	# function calls
+	addi $sp, $sp, 24
 	
 	jr $ra	# return
 
@@ -510,16 +515,19 @@ get_dot_text:
 get_text_line:
 # $a0: pointer to start of line
 # $a1: address of where to write instructions read
+# $a2: address of next intruction
 # $v0: pointer to after last instruction written
+# $v1: address of next instruction
 
 	# push to stack
-	subi $sp, $sp, 24
+	subi $sp, $sp, 28
 	sw $v1,  0($sp) 	# function calls
 	sw $a0,  4($sp)		# pointer to line, function calls
 	sw $a1,  8($sp)		# pointer to write vector
 	sw $t0, 12($sp)		# aux to hold char read, copy of a1
 	sw $t1, 16($sp)		# copy of a0
-	sw $ra, 20($sp)		# function calls
+	sw $t2, 20($sp)		# copy of a1
+	sw $ra, 24($sp)		# function calls
 
 	gtl_loop1:											# percorre linha ate achar nao whitespace
 	lbu $t0, 0($a0)									# get char
@@ -547,13 +555,17 @@ get_text_line:
 
 	gtl_found_instr:
 	# get instruction
+	move $t2, $a1
+	move $a1, $a2
 	jal get_instruction
 	move $a0, $v1					# point to after instruction
+	move $a1, $t2
 
 	# if pseudo of size 2
 	li $t0, 2
 	bne $v0, $t0, gtl_not_2_instr		# if not pseudo of 2 instruction
 	addi $s0, $s0, 2		# increase instruction counter
+	addi $a2, $a2, 2		# increase instruction counter
 	la $t1, int_found		# get instruction vector
 	lw $t0, 0($t1)			# read first instruction
 	sw $t0, 0($a1)			# write instruction to instr vector
@@ -566,6 +578,7 @@ get_text_line:
 	# if native or pseudo of size 1
 	li $t0, 1
 	addi $s0, $s0, 1		# increase instruction counter
+	addi $a2, $a2, 1		# increase instruction counter
 	la $t1, int_found		# get instruction vector
 	lw $t0, 0($t1)			# read instruction
 	sw $t0, 0($a1)			# write instruction to instr vector
@@ -577,15 +590,17 @@ get_text_line:
 
 	gtl_end_of_line:
 	move $v0, $a1 		# set up return value
-	
+	move $v1, $a2			# set up return value
+
 	# pop from stack
 	lw $v1,  0($sp) 	# function calls
 	lw $a0,  4($sp)		# pointer to line, function calls
 	lw $a1,  8($sp)		# pointer to write vector
 	lw $t0, 12($sp)		# aux to hold char read, copy of a1
 	lw $t1, 16($sp)		# copy of a0
-	lw $ra, 20($sp)		# function calls
-	addi $sp, $sp, 24
+	lw $t2, 20($sp)		# copy of a1
+	lw $ra, 24($sp)		# function calls
+	addi $sp, $sp, 28
 
 	jr $ra 		# return
 
