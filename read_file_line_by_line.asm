@@ -55,10 +55,16 @@ lineend:							.asciiz "linha acabou."
 # USED BY "create_data_file"
 filename_test:				.asciiz "Code/Trabalho/testfile_data.mif"
 filename_test2:				.asciiz "Code/Trabalho/testfile_text.mif"
+
+output_file_buffer:		.space	80
+
+data_filename:				.asciiz "_data.mif"
 data_file_header:			.ascii	"DEPTH = 4096;\nWIDTH = 32;\nADDRESS_RADIX = HEX;\nDATA_RADIX = HEX;\nCONTENT\nBEGIN\n\n"
 data_file_header_end:
 data_file_footer:			.ascii 	"\nEND;\n"
 data_file_footer_end:
+
+text_filename:				.asciiz "_text.mif"
 text_file_header:			.ascii	"DEPTH = 4096;\nWIDTH = 32;\nADDRESS_RADIX = HEX;\nDATA_RADIX = HEX;\nCONTENT\nBEGIN\n"
 text_file_header_end:
 text_file_footer:			.ascii 	"\nEND;\n"
@@ -89,11 +95,11 @@ text_file_footer_end:
 	add $s1, $s0, $s1		# pointer to after end of vector
 
 	# write .data file
-	la $a0, filename_test
+	la $a0, file_name_buffer
 	jal create_data_file
 
 	# write .text file
-	la $a0, filename_test2
+	la $a0, file_name_buffer
 	move $a1, $s0
 	move $a2, $s1
 	jal create_text_file
@@ -185,7 +191,7 @@ create_text_file:
 # $a2: pointer to end of .text vector (right after last element)
 
 	# push to stack
-	subi $sp, $sp, 40
+	subi $sp, $sp, 48
 	sw $v0,  0($sp) # sycalls
 	sw $a0,  4($sp) # sycalls, file descriptor
 	sw $a1,  8($sp) # sycalls
@@ -196,14 +202,38 @@ create_text_file:
 	sw $t3, 28($sp) # aux to save .mif address of $t2
 	sw $s0, 32($sp)	# copy of file descriptor
 	sw $ra, 36($sp) # function calls
+	sw $t5, 40($sp) # aux char read from filename given
+	sw $t6, 44($sp) # pointer to output_file_buffer
 
 	move $t0, $a1
 	move $t1, $a2
+	la $t6, output_file_buffer
 
-	la $a0, filename_test2	# TEMPORARY: temp file name
+	# get filename string
+	# copy filename string untill .asm
+	ctf_loop1:
+	lbu $t5, 0($a0)		# get char
+	beq $t5, '.', ctf_loop1_end	# stop right before '.asm'
+	sb $t5, 0($t6)		# copy char to filename being created
+	addi $a0, $a0, 1	# increase input pointer
+	addi $t6, $t6, 1	# increase output pointer
+	j ctf_loop1
+	ctf_loop1_end:
+
+	# then add "_text.asm"
+	la $a0, text_filename		# pointer to start of "_text.mif"
+	ctf_loop2:
+	lbu $t5, 0($a0)		# get char
+	sb $t5, 0($t6)		# copy char to filename being created
+	beq $t5, $zero, ctf_loop2_end	# if hit end of string, stop
+	addi $a0, $a0, 1	# increase input pointer
+	addi $t6, $t6, 1	# increase output pointer
+	j ctf_loop2
+	ctf_loop2_end:
 
 	# create file
 	li $v0, 13			# syscall to open file
+	la $a0, output_file_buffer	# filename
 	li $a1, 1				# write flag
 	li $a2, 0				# mode
 	syscall  				# file descriptor returned in $v0
@@ -220,13 +250,13 @@ create_text_file:
 	# write to file .text content
 	li $a2, 0								# load .mif address (starts at 0)
 
-	ctf_loop:
+	ctf_loop3:
 	beq $t0, $t1, ctf_dot_text_ended	# if past last, end
 	lw $a1, 0($t0)				# get word (mif content)
 	jal write_mif_content	# write content to .mif file (a0 and a2 already set up)
 	addi $t0, $t0, 4			# increase .text vector pointer
 	addi $a2, $a2, 4			# increase .mif address counter
-	j ctf_loop						# get next word
+	j ctf_loop3						# get next word
 	ctf_dot_text_ended:
 
 	# write file footers
@@ -253,7 +283,9 @@ create_text_file:
 	lw $t3, 28($sp) # aux to save .mif address of $t2
 	lw $s0, 32($sp)	# copy of file descriptor
 	lw $ra, 36($sp) # function calls
-	addi $sp, $sp, 40
+	lw $t5, 40($sp) # aux char read from filename given
+	lw $t6, 44($sp) # pointer to output_file_buffer
+	addi $sp, $sp, 48
 
 	jr $ra	# return
 
@@ -262,22 +294,49 @@ create_data_file:
 # $a0: file name string
 
 	# push to stack
-	subi $sp, $sp, 40
+	subi $sp, $sp, 48
 	sw $v0,  0($sp) # sycalls
 	sw $a0,  4($sp) # sycalls, file descriptor
 	sw $a1,  8($sp) # sycalls
 	sw $a2, 12($sp) # sycalls, .mif address in function call
-	sw $t0, 16($sp) # pointer to .data vector
-	sw $t1, 20($sp) # pointer to after last element of .data vector
+	sw $t0, 16($sp) # copy of a1
+	sw $t1, 20($sp) # copy of a2
 	sw $t2, 24($sp) # aux to get words from .data vector
 	sw $t3, 28($sp) # aux to save .mif address of $t2
 	sw $s0, 32($sp)	# copy of file descriptor
 	sw $ra, 36($sp) # function calls
+	sw $t5, 40($sp) # aux char read from filename given
+	sw $t6, 44($sp) # pointer to output_file_buffer
 
-	la $a0, filename_test	# TEMPORARY: temp file name
+	move $t0, $a1
+	move $t1, $a2
+	la $t6, output_file_buffer
+
+	# get filename string
+	# copy filename string untill .asm
+	cdf_loop1:
+	lbu $t5, 0($a0)		# get char
+	beq $t5, '.', cdf_loop1_end	# stop right before '.asm'
+	sb $t5, 0($t6)		# copy char to filename being created
+	addi $a0, $a0, 1	# increase input pointer
+	addi $t6, $t6, 1	# increase output pointer
+	j cdf_loop1
+	cdf_loop1_end:
+
+	# then add "_data.asm"
+	la $a0, data_filename		# pointer to start of "_data.mif"
+	cdf_loop2:
+	lbu $t5, 0($a0)		# get char
+	sb $t5, 0($t6)		# copy char to filename being created
+	beq $t5, $zero, cdf_loop2_end	# if hit end of string, stop
+	addi $a0, $a0, 1	# increase input pointer
+	addi $t6, $t6, 1	# increase output pointer
+	j cdf_loop2
+	cdf_loop2_end:
 
 	# create file
 	li $v0, 13			# syscall to open file
+	la $a0, output_file_buffer	# filename
 	li $a1, 1				# write flag
 	li $a2, 0				# mode
 	syscall  				# file descriptor returned in $v0
@@ -297,13 +356,13 @@ create_data_file:
 	add $t1, $t0, $t1				# pointer to after last element of .data vector
 	li $a2, 0								# load .mif address (starts at 0)
 
-	cdf_loop:
+	cdf_loop3:
 	beq $t0, $t1, cdf_dot_data_ended	# if past last, end
 	lw $a1, 0($t0)				# get word (mif content)
 	jal write_mif_content	# write content to .mif file (a0 and a2 already set up)
 	addi $t0, $t0, 4			# increase .data vector pointer
 	addi $a2, $a2, 4			# increase .mif address counter
-	j cdf_loop						# get next word
+	j cdf_loop3						# get next word
 	cdf_dot_data_ended:
 
 	# write file footers
@@ -330,7 +389,9 @@ create_data_file:
 	lw $t3, 28($sp) # aux to save .mif address of $t2
 	lw $s0, 32($sp)	# copy of file descriptor
 	lw $ra, 36($sp) # function calls
-	addi $sp, $sp, 40
+	lw $t5, 40($sp) # aux char read from filename given
+	lw $t6, 44($sp) # pointer to output_file_buffer
+	addi $sp, $sp, 48
 
 	jr $ra	# return
 
