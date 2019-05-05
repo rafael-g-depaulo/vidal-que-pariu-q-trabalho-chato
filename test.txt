@@ -5,15 +5,19 @@ _my_label_label3: .word 0x54
 
 .text
 
+super_text_label:
 li $t0, 2334
 lw $t1, 0($t0)
 lw $t2, 4($t0)
 lw $t3, 8($t0)
+text_label:
+t_label4:
 clo $t1, $t2
 add $t1, $t2, $t3
 xor $t4, $t1, $t2
 addi $t5, $t4, 10
 xori $t6, $t5, 20
+taaaaal:
 sw $t4, 0($t0)
 sw $t5, 4($t0)
 sw $t6, 8($t0)

@@ -64,26 +64,9 @@ lineend:							.asciiz "linha acabou."
 	
 	# get .text labels
 	jal dec_text_labels
-
-	# addi $a0, $a0, 4		# get first line
-	# jal get_instruction	# get instruction from line
-
-	# lw $t0, int_found		# load instruction found
 	
-		# # instrucoes do arquivo teste.
-		# li $t0, 2334
-		# lw $t1, 0($t0)
-		# lw $t2, 4($t0)
-		# lw $t3, 8($t0)
-		# clo $t1, $t2
-		# add $t1, $t2, $t3
-		# xor $t4, $t1, $t2
-		# addi $t5, $t4, 10
-		# xori $t6, $t5, 20
-		# sw $t4, 0($t0)
-		# sw $t5, 4($t0)
-		# sw $t6, 8($t0)
-
+	lw $t0, label_list
+	
 	# # transcribe data test
 	# la $a0, data_test
 	# jal transcribe_data
@@ -204,7 +187,7 @@ print_line:
 # FUNCAO QUE PERCORRE A LISTA DE LINHAS DO .text E DECLARA AS LABELS ACHADAS LA
 dec_text_labels:
 # NO ARGUMENTS
-# NO RETURN
+# $v0: number of intructions in file read
 
 	# push to stack
 	subi $sp, $sp, 16
@@ -225,7 +208,12 @@ dec_text_labels:
 	j dtl_loop
 
 	dtl_end:	# finished with .text lines
-
+	
+	# calculate number of instrctuins read
+	lui $t0, 0x0040			# address of first
+	sub $v0, $v0, $t0		# get total bytes
+	srl $v0, $v0, 2			# get total instructions read
+	
 	# pop
 	lw $a0,  0($sp)	# function calls
 	lw $a1,  8($sp)	# function calls, address of next instruction
@@ -254,6 +242,7 @@ dec_label_line:
 	lbu $t0, 0($a0)									# get char
 	addi $a0, $a0, 1								# increase pointer
 	beq $t0, ' ', dll_loop1					# while not whitespace
+	beq $t0, ')', dll_loop1					# while not whitespace
 	beq $t0, '\t', dll_loop1				# while not whitespace
 	beq $t0, '\n', dll_loop1				# while not whitespace
 	beq $t0, '\0', dll_end_of_line	# if found end of line, pop and return
@@ -1491,7 +1480,6 @@ get_instruction:
             sll $v0, $v0, 21
             or $t1, $t1, $v0        # pegando o rs
             li $v0, 1
-	    addi $v1, $v1, 1		# o char depois do reg em um lw e um ')'. apontar pro proximo char
             j end_get_instruction
 
     GIfamS:
