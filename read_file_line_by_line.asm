@@ -1706,6 +1706,8 @@ get_instruction:
             
             add $a0, $t0, $zero
             jal get_label_use
+			sll $v0, $v0, 4
+			srl $v0, $v0, 6
             or $t1, $t1, $v0
             li $v0, 1
             j end_get_instruction
@@ -1714,6 +1716,8 @@ get_instruction:
             
             add $a0, $t0, $zero
             jal get_label_use
+			sll $v0, $v0, 4
+			srl $v0, $v0, 6			
             or $t1, $t1, $v0
             li $v0, 1
             j end_get_instruction
@@ -2066,6 +2070,8 @@ get_instruction:
             or $t1, $t1, $v0        # pegando o rt, colocando na posicao e juntando ao t1
             add $a0, $v1, $zero
             jal get_label_use
+			sub $v0, $v0, $a1
+			srl $v0, $v0, 2
             or $t1, $t1, $v0        # pegando a label e colocando no t1
             li $v0, 1
             j end_get_instruction
@@ -2082,6 +2088,8 @@ get_instruction:
             or $t1, $t1, $v0        # pegando o rt, colocando na posicao e juntando ao t1
             add $a0, $v1, $zero
             jal get_label_use
+			sub $v0, $v0, $a1
+			srl $v0, $v0, 2
             or $t1, $t1, $v0        # pegando a label e colocando no t1
             li $v0, 1
             j end_get_instruction
