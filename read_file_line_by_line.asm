@@ -1,6 +1,12 @@
 .data
 
-ascii_convert_test:		.space 16
+ascii_convert_test:		.space 	16
+
+# USED BY "write_mif_content"
+word_2_string_buffer:	.space	16
+mif_newline:      		.asciiz ";\n"
+mif_separator:				.asciiz	" : "
+
 # USED BY "get_instruction"
 int_found:						.word		0, 0
 # USED BY "transcribe_data"
@@ -199,6 +205,7 @@ create_data_file:
 
 	# TODO:
 	# write to file .data content
+	
 
 	# write file footers
 	move $a0, $v0
@@ -214,6 +221,67 @@ create_data_file:
   syscall
 	
 	# pop from stack
+
+	jr $ra	# return
+
+# FUNCAO QUE ESCREVE NO ARQUIVO .mif A WORD DADA E O ENDEREÇO DADO
+write_mif_content:
+# $a0: file descriptor do arquivo
+# $a1: word a ser escrita como conteudo (apos o ':')
+# $a2: word a ser escrita como endereco (antes do ':')
+
+	# push to stack
+	subi $sp, $sp, 20
+	sw $v0,  0($sp) # syscalls
+	sw $a1,  4($sp) # syscalls
+	sw $a2,  8($sp) # syscalls
+	sw $t0, 12($sp) # copy of $a0
+	sw $t1, 16($sp) # copy of $a1
+
+	move $t0, $a0			# save $a0
+	move $t1, $a1			# save $a1
+
+	# write address
+	move $a0, $a2									# word to be converted
+	la $a1, word_2_string_buffer	# get buffer for hex -> string conversion
+	jal get_ascii_from_hex				# convert word to string
+
+	# now write converted string to file
+	move $a0, $t0
+	li $v0, 15
+	li $a2, 8
+	syscall
+
+	# write " : "
+	li $v0, 15
+	la $a1, mif_separator
+	li $a2, 3
+	syscall
+
+	# write content
+	move $a0, $t1									# word to be converted
+	la $a1, word_2_string_buffer	# get buffer for hex -> string conversion
+	jal get_ascii_from_hex				# convert word to string
+
+	# now write converted string to file
+	move $a0, $t0
+	li $v0, 15
+	li $a2, 8
+	syscall
+
+	# write ";\n"
+	li $v0, 15
+	la $a1, mif_newline
+	li $a2, 3
+	syscall
+
+	# pop from stack
+	lw $v0,  0($sp) # syscalls
+	lw $a1,  4($sp) # syscalls
+	lw $a2,  8($sp) # syscalls
+	lw $t0, 12($sp) # copy of $a0
+	lw $t1, 16($sp) # copy of $a1
+	addi $sp, $sp, 20
 
 	jr $ra	# return
 
