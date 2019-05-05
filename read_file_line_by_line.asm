@@ -181,11 +181,16 @@ create_data_file:
 # $a0: file name string
 
 	# push to stack
-	# $v0: sycalls
-	# $a0: sycalls, file descriptor
-	# $a1: sycalls
-	# $a2: sycalls
-	# $ra: function calls
+	subi $sp, $sp, 36
+	sw $v0,  0($sp) # sycalls
+	sw $a0,  4($sp) # sycalls, file descriptor
+	sw $a1,  8($sp) # sycalls
+	sw $a2, 12($sp) # sycalls, .mif address in function call
+	sw $t0, 16($sp) # pointer to .data vector
+	sw $t1, 20($sp) # pointer to after last element of .data vector
+	sw $t2, 24($sp) # aux to get words from .data vector
+	sw $t3, 28($sp) # aux to save .mif address of $t2
+	sw $ra, 32($sp) # function calls
 
 	la $a0, filename_test	# TEMPORARY: temp file name
 
@@ -203,9 +208,20 @@ create_data_file:
 	subu $a2, $a2, $a1
 	syscall
 
-	# TODO:
 	# write to file .data content
-	
+	la $t0, dot_data				# pointer to .data vector 
+	lw $t1, dot_data_used		# size of .data vector
+	add $t1, $t0, $t1				# pointer to after last element of .data vector
+	li $a2, 0								# load .mif address (starts at 0)
+
+	cdf_loop:
+	beq $t0, $t1, cdf_dot_data_ended	# if past last, end
+	lw $a1, 0($t0)				# get word (mif content)
+	jal write_mif_content	# write content to .mif file (a0 and a2 already set up)
+	addi $t0, $t0, 4			# increase .data vector pointer
+	addi $a2, $a2, 4			# increase .mif address counter
+	j cdf_loop						# get next word
+	cdf_dot_data_ended:
 
 	# write file footers
 	move $a0, $v0
@@ -221,6 +237,16 @@ create_data_file:
   syscall
 	
 	# pop from stack
+	lw $v0,  0($sp) # sycalls
+	lw $a0,  4($sp) # sycalls, file descriptor
+	lw $a1,  8($sp) # sycalls
+	lw $a2, 12($sp) # sycalls, .mif address in function call
+	lw $t0, 16($sp) # pointer to .data vector
+	lw $t1, 20($sp) # pointer to after last element of .data vector
+	lw $t2, 24($sp) # aux to get words from .data vector
+	lw $t3, 28($sp) # aux to save .mif address of $t2
+	lw $ra, 32($sp) # function calls
+	addi $sp, $sp, 36
 
 	jr $ra	# return
 
