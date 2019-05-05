@@ -1491,6 +1491,7 @@ get_instruction:
             sll $v0, $v0, 21
             or $t1, $t1, $v0        # pegando o rs
             li $v0, 1
+	    addi $v1, $v1, 1		# o char depois do reg em um lw e um ')'. apontar pro proximo char
             j end_get_instruction
 
     GIfamS:
@@ -1636,6 +1637,7 @@ get_instruction:
             sll $v0, $v0, 21
             or $t1, $t1, $v0        # pegando o rs
             li $v0, 1
+	    addi $v1, $v1, 1		# o char depois do reg em um sw e um ')'. apontar pro proximo char
             j end_get_instruction
 
     GIfamB:
