@@ -1,4 +1,7 @@
 .data
+# USED TO TEST "get_text_line"
+test_instr_buffer:		.space 	32
+
 # USED BY "get_instruction"
 int_found:						.word		0, 0
 # USED BY "transcribe_data"
@@ -57,16 +60,25 @@ lineend:							.asciiz "linha acabou."
 	# parse data test
 	jal parse_data
 	
-		# lw $a0, text_start
-		# addi $a0, $a0, 4
-		# lui $a1, 0x0400
-		# jal dec_label_line
-	
 	# get .text labels
 	jal dec_text_labels
 	
-	lw $t0, label_list
+	# get first .text line
+	lw $a0, text_start				# get first line
+	addi $a0, $a0, 4					# point to start of line
+	la $a1, test_instr_buffer	# set up pointer of where to write line
+	jal get_text_line					# get instructions in line
+
+	lw $a0, -4($a0)						# get next line
+	addi $a0, $a0, 4					# point to start of line
+	move $a1, $v0							# set up write vector pointer
+	jal get_text_line					# get instructions in line
 	
+	lw $a0, -4($a0)						# get next line
+	addi $a0, $a0, 4					# point to start of line
+	move $a1, $v0							# set up write vector pointer
+	jal get_text_line					# get instructions in line
+
 	# # transcribe data test
 	# la $a0, data_test
 	# jal transcribe_data
@@ -194,7 +206,7 @@ print_line:
 get_text_line:
 # $a0: pointer to start of line
 # $a1: address of where to write instructions read
-# $v0: counter of instructions read
+# $v0: pointer to after last instruction written
 
 	# push to stack
 	subi $sp, $sp, 24
@@ -203,32 +215,29 @@ get_text_line:
 	sw $a1,  8($sp)		# pointer to write vector
 	sw $t0, 12($sp)		# aux to hold char read, copy of a1
 	sw $t1, 16($sp)		# copy of a0
-	sw $s0, 20($sp)		# counter of instructions read
-	sw $ra, 24($sp)		# function calls
-	
-	li $s0, 0					# counter of instructions read
+	sw $ra, 20($sp)		# function calls
 
-	glt_loop1:											# percorre linha ate achar nao whitespace
+	gtl_loop1:											# percorre linha ate achar nao whitespace
 	lbu $t0, 0($a0)									# get char
 	addi $a0, $a0, 1								# increase pointer
-	beq $t0, ' ', glt_loop1					# while not whitespace
-	beq $t0, ')', glt_loop1					# while not whitespace
-	beq $t0, '\t', glt_loop1				# while not whitespace
-	beq $t0, '\n', glt_loop1				# while not whitespace
-	beq $t0, '\0', glt_end_of_line	# if found end of line, pop and return
+	beq $t0, ' ', gtl_loop1					# while not whitespace
+	beq $t0, ')', gtl_loop1					# while not whitespace
+	beq $t0, '\t', gtl_loop1				# while not whitespace
+	beq $t0, '\n', gtl_loop1				# while not whitespace
+	beq $t0, '\0', gtl_end_of_line	# if found end of line, pop and return
 
 	subi $a0, $a0, 1			# move back pointer to point to first non-whitespace char
 	move $t1, $a0					# save $a0
 
 	# non-whitespace found, look if label or instruction
-	glt_loop2:
+	gtl_loop2:
 	lbu $t0, 0($t1)				# get char
 	addi $t1, $t1, 1			# increase pointer
-	beq $t0, ':', glt_found_label	# if found :, is label dec
-	beq $t0, ' ', glt_found_instr	# if found ' ', is instr
-	j glt_loop2						# get next char
+	beq $t0, ':', gtl_found_label	# if found :, is label dec
+	beq $t0, ' ', gtl_found_instr	# if found ' ', is instr
+	j gtl_loop2						# get next char
 
-	glt_found_label:
+	gtl_found_label:
 	move $a0, $t1					# set pointer to after label dec (right after ':')
 	j gtl_loop1						# get next instruction
 
@@ -239,7 +248,7 @@ get_text_line:
 
 	# if pseudo of size 2
 	li $t0, 2
-	bne $v0, $t0, glt_not_2_instr		# if not pseudo of 2 instruction
+	bne $v0, $t0, gtl_not_2_instr		# if not pseudo of 2 instruction
 	addi $s0, $s0, 2		# increase instruction counter
 	la $t1, int_found		# get instruction vector
 	lw $t0, 0($t1)			# read first instruction
@@ -247,12 +256,11 @@ get_text_line:
 	lw $t0, 4($t1)			# read second instruction
 	sw $t0, 4($a1)			# write instruction to instr vector
 	addi $a1, $a1, 8		# point write vector to after instructions written
-	j glt_get_next_instruction
-	glt_not_2_instr:
+	j gtl_get_next_instruction
+	gtl_not_2_instr:
 
 	# if native or pseudo of size 1
 	li $t0, 1
-	bne $v0, $t0, glt_not_1_instr		# if not pseudo of 2 instruction
 	addi $s0, $s0, 1		# increase instruction counter
 	la $t1, int_found		# get instruction vector
 	lw $t0, 0($t1)			# read instruction
@@ -260,11 +268,11 @@ get_text_line:
 	addi $a1, $a1, 4		# point write vector to after instructions written
 
 	# get next instruction
-	glt_get_next_instruction:
-	j gtl_loop1						# get next instruction/label
+	gtl_get_next_instruction:
+	j gtl_loop1					# get next instruction/label
 
 	gtl_end_of_line:
-	move $v0, $s0 	# set up return value
+	move $v0, $a1 		# set up return value
 	
 	# pop from stack
 	lw $v1,  0($sp) 	# function calls
@@ -272,8 +280,7 @@ get_text_line:
 	lw $a1,  8($sp)		# pointer to write vector
 	lw $t0, 12($sp)		# aux to hold char read, copy of a1
 	lw $t1, 16($sp)		# copy of a0
-	lw $s0, 20($sp)		# counter of instructions read
-	lw $ra, 24($sp)		# function calls
+	lw $ra, 20($sp)		# function calls
 	addi $sp, $sp, 24
 
 	jr $ra 		# return
