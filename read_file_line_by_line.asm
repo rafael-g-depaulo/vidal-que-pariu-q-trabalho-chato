@@ -1,7 +1,5 @@
 .data
 
-ascii_convert_test:		.space 	16
-
 # USED BY "write_mif_content"
 word_2_string_buffer:	.space	16
 mif_newline:      		.asciiz ";\n"
@@ -9,12 +7,10 @@ mif_separator:				.asciiz	" : "
 
 # USED BY "get_instruction"
 int_found:						.word		0, 0
+
 # USED BY "transcribe_data"
 dot_data:							.space 	80		# array que vai guardar o .data do programa sendo compilado
 dot_data_used:				.word 	0			# quantidada de bytes ja escritos no dot_data
-# USED TO TEST "transcribe_data"
-data_test:						.asciiz	"     .word    asdrr: 6,0,15 \n\n LABEL_TEST: .word 35 "
-data_test2:						.asciiz	"label2: -15   ,   \n\n-0x734F, -0225 \n\n _LABEL_TEST45: .word 35 "
 
 # USED BY "insert_data_text"
 data_start:						.word		0			# ponteiro para o primeiro elemento da lista de linhas do .data
@@ -23,11 +19,6 @@ text_start:						.word		0			# ponteiro para o primeiro elemento da lista de linh
 text_end:							.word		0			# ponteiro para o ultimo elemento da lista de linhas do .text
 data_str:							.ascii 	"data"
 text_str:							.ascii 	"text"
-# USED TO TEST "insert_data_text"
-line1:								.asciiz ".data test1: .word 2, 2, 2, 2"
-line2:								.asciiz "test2: .word 2, 2, 2, 2"
-line3:								.asciiz ".text"
-line4:								.asciiz "  \t li $t2, 0x234"
 
 # USED BY "get_label_use"
 label_use_str:				.space 	40
@@ -48,14 +39,8 @@ file_buffer: 					.space 	20
 file_buffer_length: 	.word 	20
 line_buffer:					.space 	80
 file_descriptor: 			.word 	0
-newline:      				.word 	'\n'
-line:									.asciiz	"linha: "
-lineend:							.asciiz "linha acabou."
 
 # USED BY "create_data_file"
-filename_test:				.asciiz "Code/Trabalho/testfile_data.mif"
-filename_test2:				.asciiz "Code/Trabalho/testfile_text.mif"
-
 output_file_buffer:		.space	80
 
 data_filename:				.asciiz "_data.mif"
@@ -149,40 +134,6 @@ get_file_name:
 	# return
 	la $v0, file_name_buffer
 	jr $ra
-
-# FUNCAO DE TESTE QUE CONTA AS LINHAS DO AQUIVO
-count_lines:
-	# a0, linha
-	# a1, counter
-	addi $v0, $a1, 1
-	jr $ra
-
-# FUNCAO TESTE QUE PRINTA A STRING INSERIDA EM $a0
-print_line:
-	# push to stack
-	subi $sp, $sp, 12
-	sw $t0,  0($sp)
-	sw $a0,  8($sp)
-	sw $v0, 12($sp)
-	
-	move $t0, $a0
-	la $a0, line
-	li $v0, 4
-	syscall
-	move $a0, $t0
-	syscall
-	la $a0, lineend
-	syscall
-	la $a0, newline
-	syscall
-	
-	# push to stack
-	lw $t0,  0($sp)
-	lw $a0,  8($sp)
-	lw $v0, 12($sp)
-	addi $sp, $sp, 12
-	
-	jr $ra # return
 
 # FUNCAO QUE CRIA E INICIALIZA O ARQUIVO (filename)_text.mif
 create_text_file:
