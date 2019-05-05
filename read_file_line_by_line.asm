@@ -54,26 +54,13 @@ lineend:							.asciiz "linha acabou."
 
 # USED BY "create_data_file"
 filename_test:				.asciiz "Code/Trabalho/testfile_data.mif"
-data_file_header:			.ascii	"DEPTH = 4096;\nWIDTH = 32;\nADDRESS_RADIX = HEX;\nDATA_RADIX = HEX;\nCONTENT\nBEGIN\n"
+data_file_header:			.ascii	"DEPTH = 4096;\nWIDTH = 32;\nADDRESS_RADIX = HEX;\nDATA_RADIX = HEX;\nCONTENT\nBEGIN\n\n"
 data_file_header_end:
 data_file_footer:			.ascii 	"\nEND;\n"
 data_file_footer_end:
 
 
 .text
-
-	li $a0, 0x0a1b2c3d
-	la $a1, ascii_convert_test
-	jal get_ascii_from_hex
-
-	li $a0, 0x4e5f6789
-	addi $a1, $a1, 9
-	jal get_ascii_from_hex
-
-	la $t0, ascii_convert_test
-
-	li $v0, 10
-	syscall
 
 	# get filename
 	jal get_file_name
@@ -89,10 +76,13 @@ data_file_footer_end:
 	# get .text labels
 	jal dec_text_labels
 	
-	move $a0, $v0		# set up how many instructions to load in memory
+	# get program instructions
+	move $a0, $v0				# set up how many instructions to load in memory
 	jal get_dot_text
 
 	# write .data file
+	la $a0, filename_test
+	jal create_data_file
 
 	# write .text file
 
@@ -181,7 +171,7 @@ create_data_file:
 # $a0: file name string
 
 	# push to stack
-	subi $sp, $sp, 36
+	subi $sp, $sp, 40
 	sw $v0,  0($sp) # sycalls
 	sw $a0,  4($sp) # sycalls, file descriptor
 	sw $a1,  8($sp) # sycalls
@@ -190,7 +180,8 @@ create_data_file:
 	sw $t1, 20($sp) # pointer to after last element of .data vector
 	sw $t2, 24($sp) # aux to get words from .data vector
 	sw $t3, 28($sp) # aux to save .mif address of $t2
-	sw $ra, 32($sp) # function calls
+	sw $s0, 32($sp)	# copy of file descriptor
+	sw $ra, 36($sp) # function calls
 
 	la $a0, filename_test	# TEMPORARY: temp file name
 
@@ -199,7 +190,8 @@ create_data_file:
 	li $a1, 1				# write flag
 	li $a2, 0				# mode
 	syscall  				# file descriptor returned in $v0
-
+	move $s0, $v0		# save file descriptor
+	
 	# write file headers
 	move $a0, $v0
 	li $v0, 15
@@ -224,7 +216,7 @@ create_data_file:
 	cdf_dot_data_ended:
 
 	# write file footers
-	move $a0, $v0
+	move $a0, $s0
 	li $v0, 15
 	la $a1, data_file_footer
 	la $a2, data_file_footer_end
@@ -245,8 +237,9 @@ create_data_file:
 	lw $t1, 20($sp) # pointer to after last element of .data vector
 	lw $t2, 24($sp) # aux to get words from .data vector
 	lw $t3, 28($sp) # aux to save .mif address of $t2
-	lw $ra, 32($sp) # function calls
-	addi $sp, $sp, 36
+	lw $s0, 32($sp)	# copy of file descriptor
+	lw $ra, 36($sp) # function calls
+	addi $sp, $sp, 40
 
 	jr $ra	# return
 
@@ -257,12 +250,14 @@ write_mif_content:
 # $a2: word a ser escrita como endereco (antes do ':')
 
 	# push to stack
-	subi $sp, $sp, 20
-	sw $v0,  0($sp) # syscalls
-	sw $a1,  4($sp) # syscalls
-	sw $a2,  8($sp) # syscalls
-	sw $t0, 12($sp) # copy of $a0
-	sw $t1, 16($sp) # copy of $a1
+	subi $sp, $sp, 28
+	sw $v0,  0($sp) # syscalls, function calls
+	sw $a0,  4($sp) # syscalls, function calls
+	sw $a1,  8($sp) # syscalls, function calls
+	sw $a2, 12($sp) # syscalls
+	sw $t0, 16($sp) # copy of $a0
+	sw $t1, 20($sp) # copy of $a1
+	sw $ra, 24($sp) # function calls
 
 	move $t0, $a0			# save $a0
 	move $t1, $a1			# save $a1
@@ -298,16 +293,19 @@ write_mif_content:
 	# write ";\n"
 	li $v0, 15
 	la $a1, mif_newline
-	li $a2, 3
+	li $a2, 2
 	syscall
 
 	# pop from stack
-	lw $v0,  0($sp) # syscalls
-	lw $a1,  4($sp) # syscalls
-	lw $a2,  8($sp) # syscalls
-	lw $t0, 12($sp) # copy of $a0
-	lw $t1, 16($sp) # copy of $a1
-	addi $sp, $sp, 20
+	lw $v0,  0($sp) # syscalls, function calls
+	lw $a0,  4($sp) # syscalls, function calls
+	lw $a1,  8($sp) # syscalls, function calls
+	lw $a2, 12($sp) # syscalls
+	lw $t0, 16($sp) # copy of $a0
+	lw $t1, 20($sp) # copy of $a1
+	lw $ra, 24($sp) # function calls
+	addi $sp, $sp, 28
+
 
 	jr $ra	# return
 
