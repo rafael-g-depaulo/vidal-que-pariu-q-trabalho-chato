@@ -1,6 +1,4 @@
 .data
-# USED TO TEST "get_text_line"
-test_instr_buffer:		.space 	32
 
 # USED BY "get_instruction"
 int_found:						.word		0, 0
@@ -63,27 +61,8 @@ lineend:							.asciiz "linha acabou."
 	# get .text labels
 	jal dec_text_labels
 	
-	# get first .text line
-	lw $a0, text_start				# get first line
-	addi $a0, $a0, 4					# point to start of line
-	la $a1, test_instr_buffer	# set up pointer of where to write line
-	jal get_text_line					# get instructions in line
-
-	lw $a0, -4($a0)						# get next line
-	addi $a0, $a0, 4					# point to start of line
-	move $a1, $v0							# set up write vector pointer
-	jal get_text_line					# get instructions in line
-	
-	lw $a0, -4($a0)						# get next line
-	addi $a0, $a0, 4					# point to start of line
-	move $a1, $v0							# set up write vector pointer
-	jal get_text_line					# get instructions in line
-
-	# # transcribe data test
-	# la $a0, data_test
-	# jal transcribe_data
-	# la $a0, data_test2
-	# jal transcribe_data
+	move $a0, $v0		# set up how many instructions to load in memory
+	jal get_dot_text
 
 	# # print lines test
 	# move $a0, $v0
@@ -196,11 +175,45 @@ print_line:
 	
 	jr $ra # return
 
-# TODO: this
-# # FUNCAO QUE PERCORRE A LISTA DE LINHAS DO .text E ESCREVE O HEXA CORRESPONDENDE DELAS NA MEMORIA
-# get_dot_text:
-# # $a0: number of instructions to prepare
-# # $v0: address of instruction vector
+# FUNCAO QUE PERCORRE A LISTA DE LINHAS DO .text E ESCREVE O HEXA CORRESPONDENDE DELAS NA MEMORIA
+get_dot_text:
+# $a0: number of instructions to prepare
+# $v0: address of instruction vector
+
+	# push to stack
+	subi $sp, $sp, 12
+	sw $a0,  0($sp)	# function calls
+	sw $a1,  4($sp)	# function calls
+	sw $t0,  8($sp)	# pointer to list element
+	sw $ra, 12($sp)	# function calls
+
+	# allocate vector in heap
+	sll $a0, $a0, 2	# allocate 4 bytes for every instruction to be written
+	li $v0, 9
+	syscall
+
+	move $a1, $v0		# set up vector pointer as argument for get_text_line
+
+	lw $t0, text_start			# load first element (list.first)
+	move $a1, $v0
+	gdt_loop:
+	beq $t0, $zero, gdt_end	# if element == null, end
+	addi $a0, $t0, 4				# load element.line (string of the .text line)
+	jal get_text_line				# get the line's instruction's hexa code
+	move $a1, $v0						# set up write pointer
+	lw $t0, 0($t0)					# set element.next as next element
+	j gdt_loop
+
+	gdt_end:	# finished with .text lines
+
+	# pop
+	lw $a0,  0($sp)	# function calls
+	lw $a1,  4($sp)	# function calls
+	lw $t0,  8($sp)	# pointer to list element
+	lw $ra, 12($sp)	# function calls
+	addi $sp, $sp, 16
+	
+	jr $ra	# return
 
 # FUNCAO QUE PERCORRE UMA LINHA DO .text E ESCREVE TODAS AS INSTRUCOES DA LINHA EM UM VETOR RECEBIDO COMO PARAMETRO
 get_text_line:
