@@ -50,7 +50,7 @@ data_file_footer:			.ascii 	"\nEND;\n"
 data_file_footer_end:
 
 text_filename:				.asciiz "_text.mif"
-text_file_header:			.ascii	"DEPTH = 4096;\nWIDTH = 32;\nADDRESS_RADIX = HEX;\nDATA_RADIX = HEX;\nCONTENT\nBEGIN\n"
+text_file_header:			.ascii	"DEPTH = 4096;\nWIDTH = 32;\nADDRESS_RADIX = HEX;\nDATA_RADIX = HEX;\nCONTENT\nBEGIN\n\n"
 text_file_header_end:
 text_file_footer:			.ascii 	"\nEND;\n"
 text_file_footer_end:
@@ -521,9 +521,9 @@ get_text_line:
 
 	# push to stack
 	subi $sp, $sp, 28
-	sw $v1,  0($sp) 	# function calls
-	sw $a0,  4($sp)		# pointer to line, function calls
-	sw $a1,  8($sp)		# pointer to write vector
+	sw $a0,  0($sp)		# pointer to line, function calls
+	sw $a1,  4($sp)		# pointer to write vector
+	sw $a2,  8($sp)		# counter of intr addr
 	sw $t0, 12($sp)		# aux to hold char read, copy of a1
 	sw $t1, 16($sp)		# copy of a0
 	sw $t2, 20($sp)		# copy of a1
@@ -593,9 +593,9 @@ get_text_line:
 	move $v1, $a2			# set up return value
 
 	# pop from stack
-	lw $v1,  0($sp) 	# function calls
-	lw $a0,  4($sp)		# pointer to line, function calls
-	lw $a1,  8($sp)		# pointer to write vector
+	lw $a0,  0($sp)		# pointer to line, function calls
+	lw $a1,  4($sp)		# pointer to write vector
+	lw $a2,  8($sp)		# counter of intr addr
 	lw $t0, 12($sp)		# aux to hold char read, copy of a1
 	lw $t1, 16($sp)		# copy of a0
 	lw $t2, 20($sp)		# copy of a1
@@ -1650,6 +1650,7 @@ line_done:
 # FUNCAO PRA IDENTIFICAR QUAL A INSTRUCAO DA LINHA
 #####
 # a0: endereço pra algum lugar na linha antes do mnemonico
+# a1: endereco equivalente da proxima instrucao
 # v0: 
 # v1: ponteiro para proximo char depois da instrucao
 #
