@@ -184,6 +184,100 @@ print_line:
 	
 	jr $ra # return
 
+# TODO: this
+# # FUNCAO QUE PERCORRE A LISTA DE LINHAS DO .text E ESCREVE O HEXA CORRESPONDENDE DELAS NA MEMORIA
+# get_dot_text:
+# # $a0: number of instructions to prepare
+# # $v0: address of instruction vector
+
+# FUNCAO QUE PERCORRE UMA LINHA DO .text E ESCREVE TODAS AS INSTRUCOES DA LINHA EM UM VETOR RECEBIDO COMO PARAMETRO
+get_text_line:
+# $a0: pointer to start of line
+# $a1: address of where to write instructions read
+# $v0: counter of instructions read
+
+	# push to stack
+	subi $sp, $sp, 24
+	sw $v1,  0($sp) 	# function calls
+	sw $a0,  4($sp)		# pointer to line, function calls
+	sw $a1,  8($sp)		# pointer to write vector
+	sw $t0, 12($sp)		# aux to hold char read, copy of a1
+	sw $t1, 16($sp)		# copy of a0
+	sw $s0, 20($sp)		# counter of instructions read
+	sw $ra, 24($sp)		# function calls
+	
+	li $s0, 0					# counter of instructions read
+
+	glt_loop1:											# percorre linha ate achar nao whitespace
+	lbu $t0, 0($a0)									# get char
+	addi $a0, $a0, 1								# increase pointer
+	beq $t0, ' ', glt_loop1					# while not whitespace
+	beq $t0, ')', glt_loop1					# while not whitespace
+	beq $t0, '\t', glt_loop1				# while not whitespace
+	beq $t0, '\n', glt_loop1				# while not whitespace
+	beq $t0, '\0', glt_end_of_line	# if found end of line, pop and return
+
+	subi $a0, $a0, 1			# move back pointer to point to first non-whitespace char
+	move $t1, $a0					# save $a0
+
+	# non-whitespace found, look if label or instruction
+	glt_loop2:
+	lbu $t0, 0($t1)				# get char
+	addi $t1, $t1, 1			# increase pointer
+	beq $t0, ':', glt_found_label	# if found :, is label dec
+	beq $t0, ' ', glt_found_instr	# if found ' ', is instr
+	j glt_loop2						# get next char
+
+	glt_found_label:
+	move $a0, $t1					# set pointer to after label dec (right after ':')
+	j gtl_loop1						# get next instruction
+
+	gtl_found_instr:
+	# get instruction
+	jal get_instruction
+	move $a0, $v1					# point to after instruction
+
+	# if pseudo of size 2
+	li $t0, 2
+	bne $v0, $t0, glt_not_2_instr		# if not pseudo of 2 instruction
+	addi $s0, $s0, 2		# increase instruction counter
+	la $t1, int_found		# get instruction vector
+	lw $t0, 0($t1)			# read first instruction
+	sw $t0, 0($a1)			# write instruction to instr vector
+	lw $t0, 4($t1)			# read second instruction
+	sw $t0, 4($a1)			# write instruction to instr vector
+	addi $a1, $a1, 8		# point write vector to after instructions written
+	j glt_get_next_instruction
+	glt_not_2_instr:
+
+	# if native or pseudo of size 1
+	li $t0, 1
+	bne $v0, $t0, glt_not_1_instr		# if not pseudo of 2 instruction
+	addi $s0, $s0, 1		# increase instruction counter
+	la $t1, int_found		# get instruction vector
+	lw $t0, 0($t1)			# read instruction
+	sw $t0, 0($a1)			# write instruction to instr vector
+	addi $a1, $a1, 4		# point write vector to after instructions written
+
+	# get next instruction
+	glt_get_next_instruction:
+	j gtl_loop1						# get next instruction/label
+
+	gtl_end_of_line:
+	move $v0, $s0 	# set up return value
+	
+	# pop from stack
+	lw $v1,  0($sp) 	# function calls
+	lw $a0,  4($sp)		# pointer to line, function calls
+	lw $a1,  8($sp)		# pointer to write vector
+	lw $t0, 12($sp)		# aux to hold char read, copy of a1
+	lw $t1, 16($sp)		# copy of a0
+	lw $s0, 20($sp)		# counter of instructions read
+	lw $ra, 24($sp)		# function calls
+	addi $sp, $sp, 24
+
+	jr $ra 		# return
+
 # FUNCAO QUE PERCORRE A LISTA DE LINHAS DO .text E DECLARA AS LABELS ACHADAS LA
 dec_text_labels:
 # NO ARGUMENTS
@@ -1871,7 +1965,6 @@ get_instruction:
 
     jr $ra
 # fim da funcao pra identificar a instrucao
-
 
 ######## FUNCAO PARA ACHAR O NUMERO DE UM REGISTRADOR
 # a0 = endereco de algum ponto da string antes do reg
