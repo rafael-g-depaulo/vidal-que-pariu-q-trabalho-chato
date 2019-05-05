@@ -1632,7 +1632,6 @@ line_done:
 	# return
 
 # END OF FUNCTION
-
 # FUNCAO PRA IDENTIFICAR QUAL A INSTRUCAO DA LINHA
 #####
 # a0: endereço pra algum lugar na linha antes do mnemonico
@@ -2276,7 +2275,6 @@ get_instruction:
 
     jr $ra
 # fim da funcao pra identificar a instrucao
-
 ######## FUNCAO PARA ACHAR O NUMERO DE UM REGISTRADOR
 # a0 = endereco de algum ponto da string antes do reg
 # v0 = retorno com o valor (numero) do reg
