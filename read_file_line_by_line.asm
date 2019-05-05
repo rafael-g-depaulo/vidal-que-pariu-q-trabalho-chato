@@ -57,10 +57,13 @@ lineend:							.asciiz "linha acabou."
 	# parse data test
 	jal parse_data
 	
-	lw $a0, text_start
-	addi $a0, $a0, 4
-	lui $a1, 0x0400
-	jal dec_label_line
+		# lw $a0, text_start
+		# addi $a0, $a0, 4
+		# lui $a1, 0x0400
+		# jal dec_label_line
+	
+	# get .text labels
+	jal dec_text_labels
 
 	# addi $a0, $a0, 4		# get first line
 	# jal get_instruction	# get instruction from line
@@ -197,6 +200,40 @@ print_line:
 	addi $sp, $sp, 12
 	
 	jr $ra # return
+
+# FUNCAO QUE PERCORRE A LISTA DE LINHAS DO .text E DECLARA AS LABELS ACHADAS LA
+dec_text_labels:
+# NO ARGUMENTS
+# NO RETURN
+
+	# push to stack
+	subi $sp, $sp, 16
+	sw $a0,  0($sp)	# function calls
+	sw $a1,  8($sp)	# function calls, address of next instruction
+	sw $t0,  4($sp)	# pointer to text element
+	sw $ra, 12($sp)	# function calls
+
+	lw $t0, text_start			# load first element (list.first)
+	lui $a1, 0x0040					# set up address of first instruction
+
+	dtl_loop:
+	beq $t0, $zero, dtl_end	# if element == null, end
+	addi $a0, $t0, 4				# load element.line (string of the .data line)						
+	jal dec_label_line			# declare the labels found and count instructions found
+	move $a1, $v0						# save counter of instructions read
+	lw $t0, 0($t0)					# set element.next as next element
+	j dtl_loop
+
+	dtl_end:	# finished with .text lines
+
+	# pop
+	lw $a0,  0($sp)	# function calls
+	lw $a1,  8($sp)	# function calls, address of next instruction
+	lw $t0,  4($sp)	# pointer to text element
+	lw $ra, 12($sp)	# function calls
+	subi $sp, $sp, 16
+	
+	jr $ra	# return
 
 # FUNCAO QUE PERCORRE UMA LINHA INTEIRA DO .text, DECLARA LABELS ACHADAS E CONTA AS INSTRUCOES ACHADAS 
 dec_label_line:
