@@ -54,11 +54,15 @@ lineend:							.asciiz "linha acabou."
 
 # USED BY "create_data_file"
 filename_test:				.asciiz "Code/Trabalho/testfile_data.mif"
+filename_test2:				.asciiz "Code/Trabalho/testfile_text.mif"
 data_file_header:			.ascii	"DEPTH = 4096;\nWIDTH = 32;\nADDRESS_RADIX = HEX;\nDATA_RADIX = HEX;\nCONTENT\nBEGIN\n\n"
 data_file_header_end:
 data_file_footer:			.ascii 	"\nEND;\n"
 data_file_footer_end:
-
+text_file_header:			.ascii	"DEPTH = 4096;\nWIDTH = 32;\nADDRESS_RADIX = HEX;\nDATA_RADIX = HEX;\nCONTENT\nBEGIN\n"
+text_file_header_end:
+text_file_footer:			.ascii 	"\nEND;\n"
+text_file_footer_end:
 
 .text
 
@@ -79,12 +83,20 @@ data_file_footer_end:
 	# get program instructions
 	move $a0, $v0				# set up how many instructions to load in memory
 	jal get_dot_text
+	move $s0, $v0				# save address of instruction vector
+	move $s1, $a0				# number of instructions in vector
+	sll $s1, $s1, 2			# number of bytes in vector
+	add $s1, $s0, $s1		# pointer to after end of vector
 
 	# write .data file
 	la $a0, filename_test
 	jal create_data_file
 
 	# write .text file
+	la $a0, filename_test2
+	move $a1, $s0
+	move $a2, $s1
+	jal create_text_file
 
 	# end program
 	li $v0, 10
@@ -165,6 +177,85 @@ print_line:
 	addi $sp, $sp, 12
 	
 	jr $ra # return
+
+# FUNCAO QUE CRIA E INICIALIZA O ARQUIVO (filename)_text.mif
+create_text_file:
+# $a0: file name string
+# $a1: pointer to .text vector
+# $a2: pointer to end of .text vector (right after last element)
+
+	# push to stack
+	subi $sp, $sp, 40
+	sw $v0,  0($sp) # sycalls
+	sw $a0,  4($sp) # sycalls, file descriptor
+	sw $a1,  8($sp) # sycalls
+	sw $a2, 12($sp) # sycalls, .mif address in function call
+	sw $t0, 16($sp) # copy of a1
+	sw $t1, 20($sp) # copy of a2
+	sw $t2, 24($sp) # aux to get words from .text vector
+	sw $t3, 28($sp) # aux to save .mif address of $t2
+	sw $s0, 32($sp)	# copy of file descriptor
+	sw $ra, 36($sp) # function calls
+
+	move $t0, $a1
+	move $t1, $a2
+
+	la $a0, filename_test2	# TEMPORARY: temp file name
+
+	# create file
+	li $v0, 13			# syscall to open file
+	li $a1, 1				# write flag
+	li $a2, 0				# mode
+	syscall  				# file descriptor returned in $v0
+	move $s0, $v0		# save file descriptor
+	
+	# write file headers
+	move $a0, $v0
+	li $v0, 15
+	la $a1, text_file_header
+	la $a2, text_file_header_end
+	subu $a2, $a2, $a1
+	syscall
+
+	# write to file .text content
+	li $a2, 0								# load .mif address (starts at 0)
+
+	ctf_loop:
+	beq $t0, $t1, ctf_dot_text_ended	# if past last, end
+	lw $a1, 0($t0)				# get word (mif content)
+	jal write_mif_content	# write content to .mif file (a0 and a2 already set up)
+	addi $t0, $t0, 4			# increase .text vector pointer
+	addi $a2, $a2, 4			# increase .mif address counter
+	j ctf_loop						# get next word
+	ctf_dot_text_ended:
+
+	# write file footers
+	move $a0, $s0
+	li $v0, 15
+	la $a1, text_file_footer
+	la $a2, text_file_footer_end
+	subu $a2, $a2, $a1
+	syscall
+
+	# close file
+  # $a0 already has file descriptor
+	li $v0, 16
+  syscall
+	
+	# pop from stack
+	lw $v0,  0($sp) # sycalls
+	lw $a0,  4($sp) # sycalls, file descriptor
+	lw $a1,  8($sp) # sycalls
+	lw $a2, 12($sp) # sycalls, .mif address in function call
+	lw $t0, 16($sp) # pointer to .text vector
+	lw $t1, 20($sp) # pointer to after last element of .text vector
+	lw $t2, 24($sp) # aux to get words from .text vector
+	lw $t3, 28($sp) # aux to save .mif address of $t2
+	lw $s0, 32($sp)	# copy of file descriptor
+	lw $ra, 36($sp) # function calls
+	addi $sp, $sp, 40
+
+	jr $ra	# return
 
 # FUNCAO QUE CRIA E INICIALIZA O ARQUIVO (filename)_data.mif
 create_data_file:
@@ -366,21 +457,22 @@ get_dot_text:
 # $v0: address of instruction vector
 
 	# push to stack
-	subi $sp, $sp, 12
+	subi $sp, $sp, 20
 	sw $a0,  0($sp)	# function calls
 	sw $a1,  4($sp)	# function calls
 	sw $t0,  8($sp)	# pointer to list element
-	sw $ra, 12($sp)	# function calls
+	sw $t1, 12($sp)	# copy of .text vector pointer
+	sw $ra, 16($sp)	# function calls
 
 	# allocate vector in heap
 	sll $a0, $a0, 2	# allocate 4 bytes for every instruction to be written
 	li $v0, 9
 	syscall
 
-	move $a1, $v0		# set up vector pointer as argument for get_text_line
-
+	move $t1, $v0						# save start of vector pointer for return value
+	move $a1, $v0						# set up vector pointer as argument for get_text_line
 	lw $t0, text_start			# load first element (list.first)
-	move $a1, $v0
+
 	gdt_loop:
 	beq $t0, $zero, gdt_end	# if element == null, end
 	addi $a0, $t0, 4				# load element.line (string of the .text line)
@@ -390,13 +482,15 @@ get_dot_text:
 	j gdt_loop
 
 	gdt_end:	# finished with .text lines
-
+	move $v0, $t1		# set return value
+	
 	# pop
 	lw $a0,  0($sp)	# function calls
 	lw $a1,  4($sp)	# function calls
 	lw $t0,  8($sp)	# pointer to list element
-	lw $ra, 12($sp)	# function calls
-	addi $sp, $sp, 16
+	lw $t1, 12($sp)	# copy of .text vector pointer
+	lw $ra, 16($sp)	# function calls
+	addi $sp, $sp, 20
 	
 	jr $ra	# return
 
