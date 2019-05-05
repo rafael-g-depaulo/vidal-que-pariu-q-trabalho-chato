@@ -1130,8 +1130,11 @@ get_instruction:
     GIloop:
         lbu $t1, 0($t0)         # poe em t1 o caractere atual da linha
         addi $t0, $t0, 1        # marca o proximo caractere a ser pego
-        bne $t1, ' ', GIfound   # ao achar algo que nao seja ' ', considera que achou uma instr e tenta descobrir qual
-        j GIloop                # se for igual a ' ', continua procurando
+	beq $t1, ',' , GIloop        # if whitespace, keep looking
+    	beq $t1, ' ' , GIloop        # if whitespace, keep looking
+    	beq $t1, '\t', GIloop        # if whitespace, keep looking
+    	beq $t1, '\n', GIloop        # if whitespace, keep looking
+	# ao achar algo que nao seja ' ', ',', '\t' ou '\n', considera que achou uma instr e tenta descobrir qual
 
     # a partir daqui o valor em t2 nao sera mais importante, ele sera reatribuido
     # t1 = primeiro char do mnemonico, t0 = aponta pro proximo char
